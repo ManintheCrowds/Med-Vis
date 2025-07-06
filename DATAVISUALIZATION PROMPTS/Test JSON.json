@@ -1,0 +1,482 @@
+[
+  {
+    "id": "001",
+    "attendee": {
+      "first_name": "Alex",
+      "last_name": "Johnson",
+      "is_anonymous": false
+    },
+    "years_at_medtronic": 3,
+    "yearsCategory": "0-5",
+    "learning_style": "visual",
+    "shaped_by": "mentor",
+    "peak_performance": "Introvert, Morning",
+    "motivation": "growth",
+    "unique_quality": "Strong analytical thinking and problem-solving skills",
+    "connections": ["002", "015", "023"]
+  },
+  {
+    "id": "002", 
+    "attendee": {
+      "first_name": "Sarah",
+      "last_name": "Chen",
+      "is_anonymous": false
+    },
+    "years_at_medtronic": 7,
+    "yearsCategory": "6-10", 
+    "learning_style": "kinesthetic",
+    "shaped_by": "challenge",
+    "peak_performance": "Extrovert, Morning",
+    "motivation": "impact",
+    "unique_quality": "Exceptional ability to build cross-functional relationships",
+    "connections": ["001", "004", "018"]
+  },
+  {
+    "id": "003",
+    "attendee": {
+      "first_name": "Marcus",
+      "last_name": "Williams",
+      "is_anonymous": false
+    },
+    "years_at_medtronic": 12,
+    "yearsCategory": "11-15",
+    "learning_style": "auditory",
+    "shaped_by": "team",
+    "peak_performance": "Ambivert, Morning",
+    "motivation": "purpose",
+    "unique_quality": "Natural leadership and team motivation abilities",
+    "connections": ["008", "012", "025"]
+  },
+  {
+    "id": "004",
+    "attendee": {
+      "first_name": "Emily",
+      "last_name": "Rodriguez",
+      "is_anonymous": false
+    },
+    "years_at_medtronic": 15,
+    "yearsCategory": "11-15",
+    "learning_style": "reading_writing",
+    "shaped_by": "success",
+    "peak_performance": "Introvert, Night",
+    "motivation": "autonomy",
+    "unique_quality": "Deep technical expertise in medical device innovation",
+    "connections": ["002", "009", "016"]
+  },
+  {
+    "id": "005",
+    "attendee": {
+      "first_name": "James",
+      "last_name": "Thompson",
+      "is_anonymous": false
+    },
+    "years_at_medtronic": 22,
+    "yearsCategory": "20+",
+    "learning_style": "visual",
+    "shaped_by": "failure", 
+    "peak_performance": "Extrovert, Evening",
+    "motivation": "recognition",
+    "unique_quality": "Resilience and ability to turn setbacks into opportunities",
+    "connections": ["007", "013", "020"]
+  },
+  {
+    "id": "006",
+    "attendee": {
+      "first_name": "Lisa",
+      "last_name": "Park",
+      "is_anonymous": false
+    },
+    "years_at_medtronic": 4,
+    "yearsCategory": "0-5",
+    "learning_style": "kinesthetic",
+    "shaped_by": "mentor",
+    "peak_performance": "Ambivert, Night",
+    "motivation": "growth",
+    "unique_quality": "Creative problem-solving and innovative thinking",
+    "connections": ["010", "014", "027"]
+  },
+  {
+    "id": "007",
+    "attendee": {
+      "first_name": "David",
+      "last_name": "Kumar",
+      "is_anonymous": false
+    },
+    "years_at_medtronic": 9,
+    "yearsCategory": "6-10",
+    "learning_style": "auditory",
+    "shaped_by": "challenge",
+    "peak_performance": "Introvert, Morning",
+    "motivation": "impact",
+    "unique_quality": "Excellent communication and presentation skills",
+    "connections": ["005", "011", "019"]
+  },
+  {
+    "id": "008",
+    "attendee": {
+      "first_name": "Maria",
+      "last_name": "Garcia",
+      "is_anonymous": false
+    },
+    "years_at_medtronic": 6,
+    "yearsCategory": "6-10",
+    "learning_style": "reading_writing",
+    "shaped_by": "team",
+    "peak_performance": "Extrovert, Morning",
+    "motivation": "purpose",
+    "unique_quality": "Strong empathy and emotional intelligence",
+    "connections": ["003", "017", "024"]
+  },
+  {
+    "id": "009",
+    "attendee": {
+      "first_name": "Anonymous",
+      "last_name": null,
+      "is_anonymous": true
+    },
+    "years_at_medtronic": 11,
+    "yearsCategory": "11-15",
+    "learning_style": "visual",
+    "shaped_by": "other",
+    "peak_performance": "Introvert, Night",
+    "motivation": "autonomy",
+    "unique_quality": "Methodical approach to complex problem solving",
+    "connections": ["004", "021", "028"]
+  },
+  {
+    "id": "010",
+    "attendee": {
+      "first_name": "Robert",
+      "last_name": "Miller",
+      "is_anonymous": false
+    },
+    "years_at_medtronic": 18,
+    "yearsCategory": "11-15",
+    "learning_style": "kinesthetic",
+    "shaped_by": "success",
+    "peak_performance": "Ambivert, Morning",
+    "motivation": "recognition",
+    "unique_quality": "Strategic thinking and long-term planning abilities",
+    "connections": ["006", "022", "029"]
+  },
+  {
+    "id": "011",
+    "attendee": {
+      "first_name": "Jennifer",
+      "last_name": "Lee",
+      "is_anonymous": false
+    },
+    "years_at_medtronic": 2,
+    "yearsCategory": "0-5",
+    "learning_style": "auditory",
+    "shaped_by": "mentor",
+    "peak_performance": "Extrovert, Evening",
+    "motivation": "growth",
+    "unique_quality": "Adaptability and quick learning in new environments",
+    "connections": ["007", "026", "030"]
+  },
+  {
+    "id": "012",
+    "attendee": {
+      "first_name": "Michael",
+      "last_name": "Brown",
+      "is_anonymous": false
+    },
+    "years_at_medtronic": 14,
+    "yearsCategory": "11-15",
+    "learning_style": "reading_writing",
+    "shaped_by": "challenge",
+    "peak_performance": "Introvert, Morning",
+    "motivation": "purpose",
+    "unique_quality": "Detail-oriented with strong quality assurance mindset",
+    "connections": ["003", "015", "021"]
+  },
+  {
+    "id": "013",
+    "attendee": {
+      "first_name": "Anonymous",
+      "last_name": null,
+      "is_anonymous": true
+    },
+    "years_at_medtronic": 25,
+    "yearsCategory": "20+",
+    "learning_style": "visual",
+    "shaped_by": "failure",
+    "peak_performance": "Ambivert, Night",
+    "motivation": "impact",
+    "unique_quality": "Mentoring and developing talent across organizations",
+    "connections": ["005", "018", "027"]
+  },
+  {
+    "id": "014",
+    "attendee": {
+      "first_name": "Amanda",
+      "last_name": "Wilson",
+      "is_anonymous": false
+    },
+    "years_at_medtronic": 5,
+    "yearsCategory": "0-5",
+    "learning_style": "kinesthetic",
+    "shaped_by": "team",
+    "peak_performance": "Extrovert, Morning",
+    "motivation": "autonomy",
+    "unique_quality": "Collaborative leadership and team building expertise",
+    "connections": ["006", "019", "025"]
+  },
+  {
+    "id": "015",
+    "attendee": {
+      "first_name": "Christopher",
+      "last_name": "Davis",
+      "is_anonymous": false
+    },
+    "years_at_medtronic": 8,
+    "yearsCategory": "6-10",
+    "learning_style": "auditory",
+    "shaped_by": "other",
+    "peak_performance": "Introvert, Night",
+    "motivation": "recognition",
+    "unique_quality": "Systems thinking and process optimization skills",
+    "connections": ["001", "012", "023"]
+  },
+  {
+    "id": "016",
+    "attendee": {
+      "first_name": "Jessica",
+      "last_name": "Martinez",
+      "is_anonymous": false
+    },
+    "years_at_medtronic": 13,
+    "yearsCategory": "11-15",
+    "learning_style": "reading_writing",
+    "shaped_by": "success",
+    "peak_performance": "Ambivert, Morning",
+    "motivation": "growth",
+    "unique_quality": "Data analysis and insights generation capabilities",
+    "connections": ["004", "020", "028"]
+  },
+  {
+    "id": "017",
+    "attendee": {
+      "first_name": "Kevin",
+      "last_name": "Anderson",
+      "is_anonymous": false
+    },
+    "years_at_medtronic": 1,
+    "yearsCategory": "0-5",
+    "learning_style": "visual",
+    "shaped_by": "mentor",
+    "peak_performance": "Extrovert, Evening",
+    "motivation": "purpose",
+    "unique_quality": "Fresh perspective and digital innovation mindset",
+    "connections": ["008", "024", "030"]
+  },
+  {
+    "id": "018",
+    "attendee": {
+      "first_name": "Rachel",
+      "last_name": "Taylor",
+      "is_anonymous": false
+    },
+    "years_at_medtronic": 10,
+    "yearsCategory": "6-10",
+    "learning_style": "kinesthetic",
+    "shaped_by": "challenge",
+    "peak_performance": "Introvert, Morning",
+    "motivation": "impact",
+    "unique_quality": "Project management and cross-functional coordination",
+    "connections": ["002", "013", "026"]
+  },
+  {
+    "id": "019",
+    "attendee": {
+      "first_name": "Anonymous",
+      "last_name": null,
+      "is_anonymous": true
+    },
+    "years_at_medtronic": 7,
+    "yearsCategory": "6-10",
+    "learning_style": "auditory",
+    "shaped_by": "team",
+    "peak_performance": "Ambivert, Night",
+    "motivation": "autonomy",
+    "unique_quality": "Conflict resolution and negotiation expertise",
+    "connections": ["007", "014", "022"]
+  },
+  {
+    "id": "020",
+    "attendee": {
+      "first_name": "Brandon",
+      "last_name": "White",
+      "is_anonymous": false
+    },
+    "years_at_medtronic": 16,
+    "yearsCategory": "11-15",
+    "learning_style": "reading_writing",
+    "shaped_by": "failure",
+    "peak_performance": "Extrovert, Morning",
+    "motivation": "recognition",
+    "unique_quality": "Risk assessment and strategic decision making",
+    "connections": ["005", "016", "029"]
+  },
+  {
+    "id": "021",
+    "attendee": {
+      "first_name": "Stephanie",
+      "last_name": "Jackson",
+      "is_anonymous": false
+    },
+    "years_at_medtronic": 4,
+    "yearsCategory": "0-5",
+    "learning_style": "visual",
+    "shaped_by": "other",
+    "peak_performance": "Introvert, Night",
+    "motivation": "growth",
+    "unique_quality": "User experience design and customer empathy",
+    "connections": ["009", "012", "027"]
+  },
+  {
+    "id": "022",
+    "attendee": {
+      "first_name": "Daniel",
+      "last_name": "Thomas",
+      "is_anonymous": false
+    },
+    "years_at_medtronic": 23,
+    "yearsCategory": "20+",
+    "learning_style": "kinesthetic",
+    "shaped_by": "success",
+    "peak_performance": "Ambivert, Morning",
+    "motivation": "purpose",
+    "unique_quality": "Industry expertise and regulatory knowledge", 
+    "connections": ["010", "019", "025"]
+  },
+  {
+    "id": "023",
+    "attendee": {
+      "first_name": "Nicole",
+      "last_name": "Moore",
+      "is_anonymous": false
+    },
+    "years_at_medtronic": 6,
+    "yearsCategory": "6-10",
+    "learning_style": "auditory",
+    "shaped_by": "mentor",
+    "peak_performance": "Extrovert, Evening",
+    "motivation": "impact",
+    "unique_quality": "Cultural awareness and global collaboration skills",
+    "connections": ["001", "015", "024"]
+  },
+  {
+    "id": "024",
+    "attendee": {
+      "first_name": "Anonymous",
+      "last_name": null,
+      "is_anonymous": true
+    },
+    "years_at_medtronic": 9,
+    "yearsCategory": "6-10",
+    "learning_style": "reading_writing",
+    "shaped_by": "challenge",
+    "peak_performance": "Introvert, Morning",
+    "motivation": "autonomy",
+    "unique_quality": "Research methodology and evidence-based approach",
+    "connections": ["008", "017", "023"]
+  },
+  {
+    "id": "025",
+    "attendee": {
+      "first_name": "Ryan",
+      "last_name": "Harris",
+      "is_anonymous": false
+    },
+    "years_at_medtronic": 12,
+    "yearsCategory": "11-15",
+    "learning_style": "visual",
+    "shaped_by": "team",
+    "peak_performance": "Ambivert, Night",
+    "motivation": "recognition",
+    "unique_quality": "Technology integration and digital transformation",
+    "connections": ["003", "014", "022"]
+  },
+  {
+    "id": "026",
+    "attendee": {
+      "first_name": "Melissa",
+      "last_name": "Clark",
+      "is_anonymous": false
+    },
+    "years_at_medtronic": 2,
+    "yearsCategory": "0-5",
+    "learning_style": "kinesthetic",
+    "shaped_by": "failure",
+    "peak_performance": "Extrovert, Morning",
+    "motivation": "growth",
+    "unique_quality": "Agile methodology and iterative improvement mindset",
+    "connections": ["011", "018", "030"]
+  },
+  {
+    "id": "027",
+    "attendee": {
+      "first_name": "Gregory",
+      "last_name": "Lewis",
+      "is_anonymous": false
+    },
+    "years_at_medtronic": 19,
+    "yearsCategory": "11-15",
+    "learning_style": "auditory",
+    "shaped_by": "other",
+    "peak_performance": "Introvert, Evening",
+    "motivation": "purpose",
+    "unique_quality": "Sustainability focus and environmental consciousness",
+    "connections": ["006", "013", "021"]
+  },
+  {
+    "id": "028",
+    "attendee": {
+      "first_name": "Samantha",
+      "last_name": "Walker",
+      "is_anonymous": false
+    },
+    "years_at_medtronic": 8,
+    "yearsCategory": "6-10",
+    "learning_style": "reading_writing",
+    "shaped_by": "success",
+    "peak_performance": "Ambivert, Morning",
+    "motivation": "impact",
+    "unique_quality": "Supply chain optimization and operational excellence",
+    "connections": ["009", "016", "029"]
+  },
+  {
+    "id": "029",
+    "attendee": {
+      "first_name": "Jonathan",
+      "last_name": "Hall",
+      "is_anonymous": false
+    },
+    "years_at_medtronic": 21,
+    "yearsCategory": "20+",
+    "learning_style": "visual",
+    "shaped_by": "mentor",
+    "peak_performance": "Extrovert, Night",
+    "motivation": "autonomy",
+    "unique_quality": "Customer relationship management and sales expertise",
+    "connections": ["010", "020", "028"]
+  },
+  {
+    "id": "030",
+    "attendee": {
+      "first_name": "Anonymous",
+      "last_name": null,
+      "is_anonymous": true
+    },
+    "years_at_medtronic": 5,
+    "yearsCategory": "0-5",
+    "learning_style": "kinesthetic",
+    "shaped_by": "challenge",
+    "peak_performance": "Introvert, Night",
+    "motivation": "recognition",
+    "unique_quality": "Quality assurance and continuous improvement focus",
+    "connections": ["011", "017", "026"]
+  }
+]

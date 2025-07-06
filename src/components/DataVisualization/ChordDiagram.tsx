@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as d3 from 'd3';
 import { arc } from 'd3-shape';
 import { useVisualizationData } from './shared/useVisualizationData';
@@ -69,11 +69,51 @@ export default function ChordDiagram({
   const [currentSource, setCurrentSource] = useState('years_at_medtronic');
   const [currentTarget, setCurrentTarget] = useState('learning_style');
   const [insights, setInsights] = useState<Array<{ title: string; value: string; description?: string }>>([]);
-  const [rotationAngle, setRotationAngle] = useState(0);
   const [tooltip, setTooltip] = useState<{ x: number; y: number; content: React.ReactNode } | null>(null);
   const { settings } = useAppContext();
   const [lastCategoryChange, setLastCategoryChange] = useState<{ source: string; target: string }>({ source: currentSource, target: currentTarget });
   const [showSecondaryChord, setShowSecondaryChord] = useState(false);
+  
+  // Animation state management (similar to AlluvialDiagram)
+  const [animationPhase, setAnimationPhase] = useState<'full' | 'highlighting' | 'transitioning'>('full');
+  const [highlightedArcIndex, setHighlightedArcIndex] = useState<number | null>(null);
+  const [highlightedSide, setHighlightedSide] = useState<'left' | 'right' | null>(null);
+  const [isAnimating, setIsAnimating] = useState(true);
+  
+  // Secondary chord animation state
+  const [secondaryAnimationPhase, setSecondaryAnimationPhase] = useState<'full' | 'highlighting' | 'transitioning'>('full');
+  const [secondaryHighlightedArcIndex, setSecondaryHighlightedArcIndex] = useState<number | null>(null);
+  const [secondaryHighlightedSide, setSecondaryHighlightedSide] = useState<'left' | 'right' | null>(null);
+  
+  // Animation timing ref
+  const animationRef = useRef<{
+    timer: NodeJS.Timeout | null;
+    running: boolean;
+    currentIndex: number;
+    currentSide: 'left' | 'right';
+    isPaused: boolean;
+  }>({
+    timer: null,
+    running: false,
+    currentIndex: 0,
+    currentSide: 'left',
+    isPaused: false
+  });
+
+  // Secondary chord animation timing ref
+  const secondaryAnimationRef = useRef<{
+    timer: NodeJS.Timeout | null;
+    running: boolean;
+    currentIndex: number;
+    currentSide: 'left' | 'right';
+    isPaused: boolean;
+  }>({
+    timer: null,
+    running: false,
+    currentIndex: 0,
+    currentSide: 'left',
+    isPaused: false
+  });
 
   // Define available fields for the selector
   const availableFields = [
@@ -165,25 +205,160 @@ export default function ChordDiagram({
     const perfColors = ['#FF6B6B', '#FFD166', '#06D6A0', '#118AB2', '#FF9F1C', '#4ECDC4']; // Various colors for performance types
     const colors = [...yearsColors, ...perfColors.slice(0, peakPerfCategories.length)];
 
-    // Draw groups
-    g.selectAll('.chord-group')
+    // Draw groups (arcs) with animation and hover effects
+    const groupSelection = g.selectAll('.chord-group')
       .data(chordData.groups)
       .enter()
       .append('path')
       .attr('class', 'chord-group')
       .attr('d', arc as any)
       .style('fill', (d, i) => colors[i % colors.length])
-      .style('opacity', 0.8);
+      .style('opacity', 0)
+      .on('mouseenter', function(event, d: any) {
+        pauseAnimation('secondary arc hover');
+        
+        // Trigger highlighting for secondary chord
+        console.log('🎯 Secondary chord arc hover:', {
+          groupIndex: d.index,
+          category: allCategories[d.index]
+        });
+        
+        setSecondaryAnimationPhase('highlighting');
+        setSecondaryHighlightedArcIndex(d.index);
+        setSecondaryHighlightedSide(d.index < yearsCategories.length ? 'left' : 'right');
+        
+        setTooltip({
+          x: event.pageX,
+          y: event.pageY,
+          content: (
+            <div>
+              <div style={{ fontWeight: 'bold', marginBottom: 4 }}>{allCategories[d.index]?.toString().replace(/_/g, ' ') || ''}</div>
+              <div>{d.index < yearsCategories.length ? 'Years at Medtronic' : 'Peak Performance Type'}</div>
+              <div>Value: {d.value}</div>
+            </div>
+          )
+        });
+      })
+      .on('mouseleave', () => {
+        resumeAnimation('secondary arc hover end');
+        setTooltip(null);
+        
+        // Reset highlighting when animation resumes
+        setSecondaryAnimationPhase('full');
+        setSecondaryHighlightedArcIndex(null);
+        setSecondaryHighlightedSide(null);
+      });
 
-    // Draw chords
-    g.selectAll('.chord')
+    // Apply transition animations to groups
+    groupSelection
+      .transition()
+      .duration(750)
+      .style('opacity', (d, i) => {
+        // Apply full relationship chain highlighting
+        if (secondaryAnimationPhase === 'highlighting') {
+          if (secondaryHighlightedArcIndex === i) {
+            return 1.0; // Source arc is fully highlighted
+          }
+          // Check if this arc is connected to the highlighted arc
+          if (secondaryHighlightedArcIndex !== null) {
+            const isConnected = chordData.some(chord => 
+              (chord.source.index === i && chord.target.index === secondaryHighlightedArcIndex) ||
+              (chord.source.index === secondaryHighlightedArcIndex && chord.target.index === i)
+            );
+            return isConnected ? 0.95 : 0.3;
+          }
+        }
+        return 0.8;
+      })
+      .style('stroke-width', (d, i) => {
+        if (secondaryAnimationPhase === 'highlighting' && secondaryHighlightedArcIndex === i) {
+          return 3;
+        }
+        return 1;
+      })
+      .style('stroke', (d, i) => {
+        if (secondaryAnimationPhase === 'highlighting' && secondaryHighlightedArcIndex === i) {
+          return settings.isDarkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)';
+        }
+        return 'none';
+      });
+
+    // Draw chords (ribbons) with animation and hover effects
+    const chordSelection = g.selectAll('.chord')
       .data(chordData)
       .enter()
       .append('path')
       .attr('class', 'chord')
       .attr('d', ribbon as any)
       .style('fill', d => colors[d.source.index % colors.length])
-      .style('opacity', 0.6);
+      .style('opacity', 0)
+      .on('mouseenter', function(event: any, d: any) {
+        pauseAnimation('secondary ribbon hover');
+        
+        // Trigger highlighting for the source side of this ribbon
+        console.log('🎯 Secondary ribbon hover:', {
+          sourceIndex: d.source.index,
+          targetIndex: d.target.index,
+          sourceCategory: allCategories[d.source.index],
+          targetCategory: allCategories[d.target.index]
+        });
+        
+        setSecondaryAnimationPhase('highlighting');
+        setSecondaryHighlightedArcIndex(d.source.index);
+        setSecondaryHighlightedSide(d.source.index < yearsCategories.length ? 'left' : 'right');
+        
+        setTooltip({
+          x: event.pageX,
+          y: event.pageY,
+          content: (
+            <div>
+              <div style={{ fontWeight: 'bold', marginBottom: 4 }}>
+                {allCategories[d.source.index]} ↔ {allCategories[d.target.index]}
+              </div>
+              <div>Connections: {d.source.value}</div>
+            </div>
+          )
+        });
+      })
+      .on('mouseleave', function() {
+        resumeAnimation('secondary ribbon hover end');
+        setTooltip(null);
+        
+        // Reset highlighting when animation resumes
+        setSecondaryAnimationPhase('full');
+        setSecondaryHighlightedArcIndex(null);
+        setSecondaryHighlightedSide(null);
+      });
+
+    // Apply transition animations to chords
+    chordSelection
+      .transition()
+      .duration(750)
+      .style('opacity', d => {
+        if (secondaryAnimationPhase === 'highlighting') {
+          if (secondaryHighlightedArcIndex === d.source.index || secondaryHighlightedArcIndex === d.target.index) {
+            return 0.95; // Make connected ribbons very prominent
+          }
+          return 0.2; // Dim non-connected ribbons
+        }
+        return settings.isDarkMode ? 0.7 : 0.6;
+      })
+      .style('stroke-width', d => {
+        if (secondaryAnimationPhase === 'highlighting') {
+          if (secondaryHighlightedArcIndex === d.source.index || secondaryHighlightedArcIndex === d.target.index) {
+            return 2.5;
+          }
+        }
+        return 0.5;
+      })
+      .style('stroke', d => {
+        if (secondaryAnimationPhase === 'highlighting') {
+          if (secondaryHighlightedArcIndex === d.source.index || secondaryHighlightedArcIndex === d.target.index) {
+            return settings.isDarkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)';
+          }
+        }
+        return 'none';
+      });
 
     // Add labels with proper spacing and rotation
     const secondaryLabelRadius = Math.max(120, secondaryRadius * 1.45);
@@ -268,28 +443,36 @@ export default function ChordDiagram({
     }
   }, []);
 
-  // Auto-cycling logic
+  // Track current mode index with ref to avoid dependency issues
+  const currentModeIndexRef = useRef(0);
+  
+  // Update mode index when source/target changes
   useEffect(() => {
-    console.log('🎵 ChordDiagram animation useEffect:', {
+    const modeIndex = cyclingModes.findIndex(
+      mode => mode.source === currentSource && mode.target === currentTarget
+    );
+    if (modeIndex !== -1) {
+      currentModeIndexRef.current = modeIndex;
+    }
+  }, [currentSource, currentTarget]);
+
+  // Auto-cycling logic with stable dependencies
+  useEffect(() => {
+    console.log('🎵 ChordDiagram auto-cycling useEffect:', {
       autoPlay,
       isAutoPlayEnabled: settings.isAutoPlayEnabled,
-      currentSource,
-      currentTarget,
       autoPlaySpeed: settings.autoPlaySpeed
     });
 
     if (!autoPlay || !settings.isAutoPlayEnabled) {
-      console.log('❌ ChordDiagram animation disabled:', { autoPlay, isAutoPlayEnabled: settings.isAutoPlayEnabled });
+      console.log('❌ ChordDiagram auto-cycling disabled');
       return;
     }
 
-    console.log('✅ ChordDiagram starting animation cycle');
+    console.log('✅ ChordDiagram starting auto-cycling');
 
     const interval = setInterval(() => {
-      const currentModeIndex = cyclingModes.findIndex(
-        mode => mode.source === currentSource && mode.target === currentTarget
-      );
-      const nextModeIndex = (currentModeIndex + 1) % cyclingModes.length;
+      const nextModeIndex = (currentModeIndexRef.current + 1) % cyclingModes.length;
       const nextMode = cyclingModes[nextModeIndex];
       
       // Safety check: ensure source and target are different
@@ -299,33 +482,574 @@ export default function ChordDiagram({
       }
       
       console.log('🔄 ChordDiagram cycling to:', {
-        from: `${currentSource} → ${currentTarget}`,
+        from: `mode ${currentModeIndexRef.current}`,
         to: `${nextMode.source} → ${nextMode.target}`,
         modeIndex: nextModeIndex
       });
       
+      currentModeIndexRef.current = nextModeIndex;
       setCurrentSource(nextMode.source);
       setCurrentTarget(nextMode.target);
       setLastCategoryChange({ source: nextMode.source, target: nextMode.target });
       onRelationshipChange?.(nextMode.source, nextMode.target);
-    }, settings.autoPlaySpeed || 6000); // Use global setting
+    }, settings.autoPlaySpeed || 6000);
 
     return () => {
-      console.log('🧹 ChordDiagram cleaning up animation interval');
+      console.log('🧹 ChordDiagram cleaning up auto-cycling interval');
       clearInterval(interval);
     };
-  }, [autoPlay, onRelationshipChange, currentSource, currentTarget, settings.isAutoPlayEnabled, settings.autoPlaySpeed]);
+  }, [autoPlay, settings.isAutoPlayEnabled, settings.autoPlaySpeed]); // Stable dependencies only
 
-  // Gentle rotation during auto-play
+  // Remove pulsing animation to eliminate flickering - will use CSS animations instead if needed
+
+  // Arc highlighting animation with connected ribbons
   useEffect(() => {
-    if (!autoPlay || !enableRotation || !settings.isAutoPlayEnabled) return;
+    console.log('🔄 ChordDiagram arc highlighting effect:', {
+      autoPlay,
+      isAutoPlayEnabled: settings.isAutoPlayEnabled,
+      dataLength: data.length
+    });
 
-    const interval = setInterval(() => {
-      setRotationAngle(prev => (prev + 0.5) % 360);
-    }, 100);
+    if (!autoPlay || !settings.isAutoPlayEnabled || !data.length) {
+      console.log('❌ Arc highlighting disabled');
+      // Reset to full opacity when animation is disabled
+      setAnimationPhase('full');
+      setHighlightedArcIndex(null);
+      setHighlightedSide(null);
+      if (animationRef.current.timer) {
+        clearTimeout(animationRef.current.timer);
+        animationRef.current.timer = null;
+      }
+      animationRef.current.running = false;
+      return;
+    }
 
-    return () => clearInterval(interval);
-  }, [autoPlay, enableRotation, settings.isAutoPlayEnabled]);
+    const animate = () => {
+      if (!animationRef.current.running || animationRef.current.isPaused) return;
+
+      console.log('🎯 ChordDiagram arc animation:', {
+        side: animationRef.current.currentSide,
+        index: animationRef.current.currentIndex
+      });
+
+      setAnimationPhase('highlighting');
+      setHighlightedArcIndex(animationRef.current.currentIndex);
+      setHighlightedSide(animationRef.current.currentSide);
+      
+      // Log what connections will be highlighted
+      const debugFilteredData = settings.useTestData ? data : data.filter(item => !(item as any).test_data);
+      const debugLeftValues = currentSource === 'years_at_medtronic'
+        ? ['0-5', '6-10', '11-15', '16-20', '20+']
+        : Array.from(new Set(debugFilteredData.map(d => (d as any)[currentSource]))).filter(Boolean);
+      const debugRightValues = currentTarget === 'years_at_medtronic'
+        ? ['0-5', '6-10', '11-15', '16-20', '20+']
+        : Array.from(new Set(debugFilteredData.map(d => (d as any)[currentTarget]))).filter(Boolean);
+      
+      const highlightedCategory = animationRef.current.currentSide === 'left' 
+        ? debugLeftValues[animationRef.current.currentIndex]
+        : debugRightValues[animationRef.current.currentIndex];
+      
+      console.log('✨ Highlighting full relationship chain for:', {
+        sourceCategory: highlightedCategory,
+        sourceSide: animationRef.current.currentSide,
+        sourceIndex: animationRef.current.currentIndex
+      });
+
+      // Calculate timing based on global settings
+      const stepDuration = Math.max(1000, (settings.autoPlaySpeed || 3000) / 4);
+      const pauseDuration = Math.max(200, stepDuration / 6);
+
+      // Get current data context
+      const filteredData = settings.useTestData ? data : data.filter(item => !(item as any).test_data);
+      const leftValues = currentSource === 'years_at_medtronic'
+        ? ['0-5', '6-10', '11-15', '16-20', '20+']
+        : Array.from(new Set(filteredData.map(d => (d as any)[currentSource]))).filter(Boolean);
+      const rightValues = currentTarget === 'years_at_medtronic'
+        ? ['0-5', '6-10', '11-15', '16-20', '20+']
+        : Array.from(new Set(filteredData.map(d => (d as any)[currentTarget]))).filter(Boolean);
+
+      const currentSideLength = animationRef.current.currentSide === 'left' ? leftValues.length : rightValues.length;
+
+      // Move to next position
+      if (animationRef.current.currentIndex < currentSideLength - 1) {
+        animationRef.current.timer = setTimeout(() => {
+          if (animationRef.current.running && !animationRef.current.isPaused) {
+            animationRef.current.currentIndex++;
+            animate();
+          }
+        }, stepDuration + pauseDuration);
+      } else {
+        // Switch sides or complete cycle
+        if (animationRef.current.currentSide === 'left') {
+          animationRef.current.currentSide = 'right';
+          animationRef.current.currentIndex = 0;
+          animationRef.current.timer = setTimeout(() => {
+            if (animationRef.current.running && !animationRef.current.isPaused) {
+              animate();
+            }
+          }, stepDuration);
+        } else {
+          // Complete cycle - show full diagram briefly, then restart
+          setAnimationPhase('full');
+          setHighlightedArcIndex(null);
+          setHighlightedSide(null);
+          
+          animationRef.current.timer = setTimeout(() => {
+            if (animationRef.current.running && !animationRef.current.isPaused) {
+              animationRef.current.currentSide = 'left';
+              animationRef.current.currentIndex = 0;
+              animate();
+            }
+          }, stepDuration * 2);
+        }
+      }
+    };
+
+    // Start animation if not already running
+    if (!animationRef.current.running) {
+      console.log('✅ Starting ChordDiagram arc highlighting animation');
+      animationRef.current.running = true;
+      animationRef.current.currentIndex = 0;
+      animationRef.current.currentSide = 'left';
+      animationRef.current.isPaused = false;
+      animate();
+    } else {
+      console.log('⚠️ Arc highlighting animation already running');
+    }
+
+    return () => {
+      console.log('🧹 Cleaning up ChordDiagram arc highlighting animation');
+      if (animationRef.current.timer) {
+        clearTimeout(animationRef.current.timer);
+        animationRef.current.timer = null;
+      }
+      animationRef.current.running = false;
+      setAnimationPhase('full');
+      setHighlightedArcIndex(null);
+      setHighlightedSide(null);
+    };
+  }, [autoPlay, settings.isAutoPlayEnabled, data.length, currentSource, currentTarget, settings.autoPlaySpeed, settings.useTestData]);
+
+  // Secondary chord animation system
+  useEffect(() => {
+    if (!autoPlay || !settings.isAutoPlayEnabled || !data.length || !showSecondaryChord) {
+      // Stop animation if conditions not met
+      console.log('🛑 Stopping secondary chord animation:', {
+        autoPlay,
+        isAutoPlayEnabled: settings.isAutoPlayEnabled,
+        hasData: data.length > 0,
+        showSecondaryChord
+      });
+      
+      if (secondaryAnimationRef.current.timer) {
+        clearTimeout(secondaryAnimationRef.current.timer);
+        secondaryAnimationRef.current.timer = null;
+      }
+      secondaryAnimationRef.current.running = false;
+      return;
+    }
+
+    const animateSecondary = () => {
+      if (!secondaryAnimationRef.current.running || secondaryAnimationRef.current.isPaused) return;
+
+      // Get secondary chord data context first
+      const filteredData = settings.useTestData ? data : data.filter(item => !(item as any).test_data);
+      const secondaryData = filteredData.filter(d => (d as any).peak_performance);
+      const yearsCategories = ['0-5', '6-10', '11-15', '16-20', '20+'];
+      const peakPerfCategories = Array.from(new Set(secondaryData.map(d => (d as any).peak_performance))).filter(Boolean).sort();
+      const allCategories = [...yearsCategories, ...peakPerfCategories];
+
+      console.log('🎯 SecondaryChord arc animation:', {
+        side: secondaryAnimationRef.current.currentSide,
+        index: secondaryAnimationRef.current.currentIndex
+      });
+
+      setSecondaryAnimationPhase('highlighting');
+      
+      // Calculate the actual arc index based on side and position
+      const actualArcIndex = secondaryAnimationRef.current.currentSide === 'left' 
+        ? secondaryAnimationRef.current.currentIndex // Left side: direct index (0-4)
+        : yearsCategories.length + secondaryAnimationRef.current.currentIndex; // Right side: offset by years count
+      
+      setSecondaryHighlightedArcIndex(actualArcIndex);
+      setSecondaryHighlightedSide(secondaryAnimationRef.current.currentSide);
+
+      // Calculate timing based on global settings
+      const stepDuration = Math.max(1000, (settings.autoPlaySpeed || 3000) / 4);
+      const pauseDuration = Math.max(200, stepDuration / 6);
+
+      const currentSideLength = secondaryAnimationRef.current.currentSide === 'left' ? yearsCategories.length : peakPerfCategories.length;
+
+      // Move to next position
+      if (secondaryAnimationRef.current.currentIndex < currentSideLength - 1) {
+        secondaryAnimationRef.current.timer = setTimeout(() => {
+          if (secondaryAnimationRef.current.running && !secondaryAnimationRef.current.isPaused) {
+            secondaryAnimationRef.current.currentIndex++;
+            animateSecondary();
+          }
+        }, stepDuration + pauseDuration);
+      } else {
+        // Switch sides or complete cycle
+        if (secondaryAnimationRef.current.currentSide === 'left') {
+          secondaryAnimationRef.current.currentSide = 'right';
+          secondaryAnimationRef.current.currentIndex = 0;
+          secondaryAnimationRef.current.timer = setTimeout(() => {
+            if (secondaryAnimationRef.current.running && !secondaryAnimationRef.current.isPaused) {
+              animateSecondary();
+            }
+          }, stepDuration);
+        } else {
+          // Complete cycle - show full diagram briefly, then restart
+          setSecondaryAnimationPhase('full');
+          setSecondaryHighlightedArcIndex(null);
+          setSecondaryHighlightedSide(null);
+          
+          secondaryAnimationRef.current.timer = setTimeout(() => {
+            if (secondaryAnimationRef.current.running && !secondaryAnimationRef.current.isPaused) {
+              secondaryAnimationRef.current.currentSide = 'left';
+              secondaryAnimationRef.current.currentIndex = 0;
+              animateSecondary();
+            }
+          }, stepDuration * 2);
+        }
+      }
+    };
+
+    // Start animation if not already running
+    if (!secondaryAnimationRef.current.running) {
+      console.log('✅ Starting SecondaryChord arc highlighting animation');
+      secondaryAnimationRef.current.running = true;
+      secondaryAnimationRef.current.currentIndex = 0;
+      secondaryAnimationRef.current.currentSide = 'left';
+      secondaryAnimationRef.current.isPaused = false;
+      animateSecondary();
+    } else {
+      console.log('⚠️ Secondary arc highlighting animation already running');
+    }
+
+    return () => {
+      console.log('🧹 Cleaning up SecondaryChord arc highlighting animation');
+      if (secondaryAnimationRef.current.timer) {
+        clearTimeout(secondaryAnimationRef.current.timer);
+        secondaryAnimationRef.current.timer = null;
+      }
+      secondaryAnimationRef.current.running = false;
+      setSecondaryAnimationPhase('full');
+      setSecondaryHighlightedArcIndex(null);
+      setSecondaryHighlightedSide(null);
+    };
+  }, [autoPlay, settings.isAutoPlayEnabled, data.length, showSecondaryChord, settings.autoPlaySpeed, settings.useTestData]);
+
+  // Re-render secondary chord when its animation state changes
+  useEffect(() => {
+    if (showSecondaryChord) {
+      renderSecondaryChord();
+    }
+  }, [showSecondaryChord, data, settings.useTestData, settings.isDarkMode]);
+
+  // Update visual styling of existing main chord elements when animation state changes
+  useEffect(() => {
+    if (!svgRef.current) return;
+
+    const svg = d3.select(svgRef.current);
+    
+    // Update left arcs opacity and stroke based on animation state
+    svg.selectAll('path.left-arc')
+      .transition()
+      .duration(300)
+      .style('opacity', (d: any, i: number) => {
+        if (animationPhase === 'highlighting') {
+          if (highlightedSide === 'left') {
+            if (i === highlightedArcIndex) {
+              return 1.0; // Source arc is fully highlighted
+            }
+            return 0.4; // Dim other left arcs
+          }
+        }
+        return 0.8; // Default opacity
+      })
+      .style('stroke-width', (d: any, i: number) => {
+        if (animationPhase === 'highlighting') {
+          if (highlightedSide === 'left' && i === highlightedArcIndex) {
+            return 3;
+          }
+        }
+        return 1;
+      })
+      .style('stroke', (d: any, i: number) => {
+        if (animationPhase === 'highlighting') {
+          if (highlightedSide === 'left' && i === highlightedArcIndex) {
+            return settings.isDarkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)';
+          }
+        }
+        return 'none';
+      });
+
+    // Update right arcs opacity and stroke based on animation state
+    svg.selectAll('path.right-arc')
+      .transition()
+      .duration(300)
+      .style('opacity', (d: any, i: number) => {
+        if (animationPhase === 'highlighting') {
+          if (highlightedSide === 'right') {
+            if (i === highlightedArcIndex) {
+              return 1.0; // Source arc is fully highlighted
+            }
+            return 0.4; // Dim other right arcs
+          }
+        }
+        return 0.8; // Default opacity
+      })
+      .style('stroke-width', (d: any, i: number) => {
+        if (animationPhase === 'highlighting') {
+          if (highlightedSide === 'right' && i === highlightedArcIndex) {
+            return 3;
+          }
+        }
+        return 1;
+      })
+      .style('stroke', (d: any, i: number) => {
+        if (animationPhase === 'highlighting') {
+          if (highlightedSide === 'right' && i === highlightedArcIndex) {
+            return settings.isDarkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)';
+          }
+        }
+        return 'none';
+      });
+
+    // Update ribbons opacity and stroke based on animation state
+    svg.selectAll('path.ribbon')
+      .transition()
+      .duration(300)
+      .style('opacity', (d: any) => {
+        if (animationPhase === 'highlighting') {
+          if (highlightedSide === 'left' && highlightedArcIndex === d.source.index) {
+            return 0.95; // Make connected ribbons very prominent
+          }
+          if (highlightedSide === 'right' && highlightedArcIndex === d.target.index) {
+            return 0.95; // Make connected ribbons very prominent
+          }
+          return 0.2; // Dim non-connected ribbons
+        }
+        return settings.isDarkMode ? 0.7 : 0.6;
+      })
+      .style('stroke-width', (d: any) => {
+        if (animationPhase === 'highlighting') {
+          if ((highlightedSide === 'left' && highlightedArcIndex === d.source.index) ||
+              (highlightedSide === 'right' && highlightedArcIndex === d.target.index)) {
+            return 2.5;
+          }
+        }
+        return 0.5;
+      })
+      .style('stroke', (d: any) => {
+        if (animationPhase === 'highlighting') {
+          if ((highlightedSide === 'left' && highlightedArcIndex === d.source.index) ||
+              (highlightedSide === 'right' && highlightedArcIndex === d.target.index)) {
+            return settings.isDarkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)';
+          }
+        }
+        return 'none';
+      });
+
+
+  }, [animationPhase, highlightedArcIndex, highlightedSide, settings.isDarkMode]);
+
+  // Update visual styling of existing secondary chord elements when animation state changes
+  useEffect(() => {
+    if (!secondarySvgRef.current || !showSecondaryChord) return;
+
+    const svg = d3.select(secondarySvgRef.current);
+    
+    // Update secondary chord elements based on their animation state
+    svg.selectAll('path.chord-group')
+      .transition()
+      .duration(300)
+      .style('opacity', (d: any, i: number) => {
+        if (secondaryAnimationPhase === 'highlighting') {
+          if (secondaryHighlightedArcIndex === i) {
+            return 1.0; // Source arc is fully highlighted
+          }
+          return 0.4; // Dim other arcs
+        }
+        return 0.8;
+      })
+      .style('stroke-width', (d: any, i: number) => {
+        if (secondaryAnimationPhase === 'highlighting' && secondaryHighlightedArcIndex === i) {
+          return 3;
+        }
+        return 1;
+      })
+      .style('stroke', (d: any, i: number) => {
+        if (secondaryAnimationPhase === 'highlighting' && secondaryHighlightedArcIndex === i) {
+          return settings.isDarkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)';
+        }
+        return 'none';
+      });
+
+    svg.selectAll('path.chord')
+      .transition()
+      .duration(300)
+      .style('opacity', (d: any) => {
+        if (secondaryAnimationPhase === 'highlighting') {
+          if (secondaryHighlightedArcIndex === d.source.index || secondaryHighlightedArcIndex === d.target.index) {
+            return 0.95; // Make connected ribbons very prominent
+          }
+          return 0.2; // Dim non-connected ribbons
+        }
+        return settings.isDarkMode ? 0.7 : 0.6;
+      })
+      .style('stroke-width', (d: any) => {
+        if (secondaryAnimationPhase === 'highlighting') {
+          if (secondaryHighlightedArcIndex === d.source.index || secondaryHighlightedArcIndex === d.target.index) {
+            return 2.5;
+          }
+        }
+        return 0.5;
+      })
+      .style('stroke', (d: any) => {
+        if (secondaryAnimationPhase === 'highlighting') {
+          if (secondaryHighlightedArcIndex === d.source.index || secondaryHighlightedArcIndex === d.target.index) {
+            return settings.isDarkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)';
+          }
+        }
+        return 'none';
+      });
+
+
+  }, [secondaryAnimationPhase, secondaryHighlightedArcIndex, secondaryHighlightedSide, settings.isDarkMode, showSecondaryChord]);
+
+  // Remove conflicting opacity update system - opacity will be handled in main rendering
+
+  // Pause/Resume animation functions (similar to AlluvialDiagram)
+  const pauseAnimation = useCallback((reason: string) => {
+    // Pause main chord animation
+    if (animationRef.current.running && !animationRef.current.isPaused) {
+      console.log('⏸️ Pausing Main Chord animation:', reason);
+      animationRef.current.isPaused = true;
+      if (animationRef.current.timer) {
+        clearTimeout(animationRef.current.timer);
+        animationRef.current.timer = null;
+      }
+    }
+    
+    // Pause secondary chord animation
+    if (secondaryAnimationRef.current.running && !secondaryAnimationRef.current.isPaused) {
+      console.log('⏸️ Pausing Secondary Chord animation:', reason);
+      secondaryAnimationRef.current.isPaused = true;
+      if (secondaryAnimationRef.current.timer) {
+        clearTimeout(secondaryAnimationRef.current.timer);
+        secondaryAnimationRef.current.timer = null;
+      }
+    }
+  }, []);
+
+  const resumeAnimation = useCallback((reason: string) => {
+    // Resume main chord animation
+    if (animationRef.current.running && animationRef.current.isPaused) {
+      console.log('▶️ Resuming Main Chord animation:', reason);
+      animationRef.current.isPaused = false;
+      
+      // Restart the animation timer immediately
+      const restartMainAnimation = () => {
+        if (!animationRef.current.running || animationRef.current.isPaused) return;
+
+        console.log('🔄 Restarting Main Chord animation after pause');
+        setAnimationPhase('highlighting');
+        setHighlightedArcIndex(animationRef.current.currentIndex);
+        setHighlightedSide(animationRef.current.currentSide);
+        
+        // Calculate timing based on global settings
+        const stepDuration = Math.max(1000, (settings.autoPlaySpeed || 3000) / 4);
+        const pauseDuration = Math.max(200, stepDuration / 6);
+
+        // Get current data context
+        const filteredData = settings.useTestData ? data : data.filter(item => !(item as any).test_data);
+        const leftValues = currentSource === 'years_at_medtronic'
+          ? ['0-5', '6-10', '11-15', '16-20', '20+']
+          : Array.from(new Set(filteredData.map(d => (d as any)[currentSource]))).filter(Boolean);
+        const rightValues = currentTarget === 'years_at_medtronic'
+          ? ['0-5', '6-10', '11-15', '16-20', '20+']
+          : Array.from(new Set(filteredData.map(d => (d as any)[currentTarget]))).filter(Boolean);
+
+        const currentSideLength = animationRef.current.currentSide === 'left' ? leftValues.length : rightValues.length;
+
+        // Continue animation from current position
+        animationRef.current.timer = setTimeout(() => {
+          if (animationRef.current.running && !animationRef.current.isPaused) {
+            if (animationRef.current.currentIndex < currentSideLength - 1) {
+              animationRef.current.currentIndex++;
+            } else {
+              // Switch sides or restart
+              if (animationRef.current.currentSide === 'left') {
+                animationRef.current.currentSide = 'right';
+                animationRef.current.currentIndex = 0;
+              } else {
+                animationRef.current.currentSide = 'left';
+                animationRef.current.currentIndex = 0;
+              }
+            }
+            restartMainAnimation();
+          }
+        }, stepDuration);
+      };
+      
+      restartMainAnimation();
+    }
+    
+    // Resume secondary chord animation
+    if (secondaryAnimationRef.current.running && secondaryAnimationRef.current.isPaused) {
+      console.log('▶️ Resuming Secondary Chord animation:', reason);
+      secondaryAnimationRef.current.isPaused = false;
+      
+      // Restart the secondary animation timer immediately
+      const restartSecondaryAnimation = () => {
+        if (!secondaryAnimationRef.current.running || secondaryAnimationRef.current.isPaused) return;
+
+        console.log('🔄 Restarting Secondary Chord animation after pause');
+        
+        // Get secondary chord data context
+        const filteredData = settings.useTestData ? data : data.filter(item => !(item as any).test_data);
+        const secondaryData = filteredData.filter(d => (d as any).peak_performance);
+        const yearsCategories = ['0-5', '6-10', '11-15', '16-20', '20+'];
+        const peakPerfCategories = Array.from(new Set(secondaryData.map(d => (d as any).peak_performance))).filter(Boolean).sort();
+        
+        // Calculate the actual arc index based on side and position
+        const actualArcIndex = secondaryAnimationRef.current.currentSide === 'left' 
+          ? secondaryAnimationRef.current.currentIndex 
+          : yearsCategories.length + secondaryAnimationRef.current.currentIndex;
+        
+        setSecondaryAnimationPhase('highlighting');
+        setSecondaryHighlightedArcIndex(actualArcIndex);
+        setSecondaryHighlightedSide(secondaryAnimationRef.current.currentSide);
+        
+        // Calculate timing based on global settings
+        const stepDuration = Math.max(1000, (settings.autoPlaySpeed || 3000) / 4);
+        const currentSideLength = secondaryAnimationRef.current.currentSide === 'left' ? yearsCategories.length : peakPerfCategories.length;
+
+        // Continue animation from current position
+        secondaryAnimationRef.current.timer = setTimeout(() => {
+          if (secondaryAnimationRef.current.running && !secondaryAnimationRef.current.isPaused) {
+            if (secondaryAnimationRef.current.currentIndex < currentSideLength - 1) {
+              secondaryAnimationRef.current.currentIndex++;
+            } else {
+              // Switch sides or restart
+              if (secondaryAnimationRef.current.currentSide === 'left') {
+                secondaryAnimationRef.current.currentSide = 'right';
+                secondaryAnimationRef.current.currentIndex = 0;
+              } else {
+                secondaryAnimationRef.current.currentSide = 'left';
+                secondaryAnimationRef.current.currentIndex = 0;
+              }
+            }
+            restartSecondaryAnimation();
+          }
+        }, stepDuration);
+      };
+      
+      restartSecondaryAnimation();
+    }
+  }, [settings.autoPlaySpeed, settings.useTestData, data, currentSource, currentTarget]);
 
   // Check if container is too small
   const margin = { top: 80, right: 80, bottom: 100, left: 80 };
@@ -433,6 +1157,11 @@ export default function ChordDiagram({
 
     // Check if this is a category change that should trigger animation
     const isCategoryChange = lastCategoryChange.source !== currentSource || lastCategoryChange.target !== currentTarget;
+    
+    // Add smooth transitions for category changes
+    const transition = d3.transition()
+      .duration(isCategoryChange ? 750 : 200)
+      .ease(d3.easeCubicInOut);
 
     // --- True left/right bipartite layout with better spacing ---
     // Left arcs: 180°+gap to 360°-gap (Math.PI+gap to 2*Math.PI-gap)
@@ -555,16 +1284,27 @@ export default function ChordDiagram({
         .attr('offset', d => d.offset)
         .attr('stop-color', d => d.color);
     });
-    g.selectAll('path.left-arc')
+    // Create left arcs with event handlers first
+    const leftArcSelection = g.selectAll('path.left-arc')
       .data(leftArcs)
       .enter()
       .append('path')
       .attr('class', 'left-arc')
       .attr('d', d => arcGen({ startAngle: d.startAngle, endAngle: d.endAngle } as any))
       .attr('fill', (d, i) => `url(#left-arc-gradient-${i})`)
-      .attr('opacity', d => d.opacity)
-      .on('mouseenter', function(event, d) {
+      .attr('opacity', 0)
+      .on('mouseenter', function(event, d: any) {
         if (d.value === 0) return;
+        
+        pauseAnimation('left arc hover');
+        
+        // Trigger the same highlighting as auto-cycle animation
+        const arcIndex = leftArcs.findIndex(arc => arc.name === d.name);
+        
+        setAnimationPhase('highlighting');
+        setHighlightedArcIndex(arcIndex);
+        setHighlightedSide('left');
+        
         setTooltip({
           x: event.pageX,
           y: event.pageY,
@@ -576,17 +1316,99 @@ export default function ChordDiagram({
           )
         });
       })
-      .on('mouseleave', () => setTooltip(null));
-    g.selectAll('path.right-arc')
+      .on('mouseleave', () => {
+        resumeAnimation('left arc hover end');
+        setTooltip(null);
+        
+        // Reset highlighting when animation resumes
+        setAnimationPhase('full');
+        setHighlightedArcIndex(null);
+        setHighlightedSide(null);
+      });
+    
+    // Apply transition animations separately
+    leftArcSelection
+      .transition(transition)
+      .attr('opacity', (d, i) => {
+        // Apply full relationship chain highlighting
+        if (animationPhase === 'highlighting') {
+          if (highlightedSide === 'left') {
+            // Highlight the source arc
+            if (i === highlightedArcIndex) {
+              return 1.0; // Source arc is fully highlighted
+            }
+            // Check if this arc is connected to the highlighted right arc
+            if (highlightedSide === 'left' && highlightedArcIndex !== null) {
+              return 0.4; // Dim other left arcs
+            }
+          } else if (highlightedSide === 'right' && highlightedArcIndex !== null) {
+            // When right arc is highlighted, highlight left arcs connected to it
+            const matrixValue = connectionMatrix[i] && connectionMatrix[i][highlightedArcIndex];
+            const isConnectedToHighlightedRight = matrixValue > 0;
+            console.log(`🔗 Left arc ${i} (${leftArcs[i]?.name}) connected to right arc ${highlightedArcIndex} (${rightArcs[highlightedArcIndex]?.name})?`, 
+              isConnectedToHighlightedRight, 'Matrix value:', matrixValue);
+            return isConnectedToHighlightedRight ? 0.95 : 0.3; // Higher contrast
+          }
+        }
+        // Use stable base opacity without pulsing to prevent flickering
+        return Math.max(0.8, d.opacity);
+      })
+      .attr('stroke-width', (d, i) => {
+        // Enhanced stroke for relationship chain
+        if (animationPhase === 'highlighting') {
+          if (highlightedSide === 'left' && i === highlightedArcIndex) {
+            return 3; // Thickest stroke for source arc
+          }
+          // Stroke for connected arcs when right side is highlighted
+          if (highlightedSide === 'right' && highlightedArcIndex !== null) {
+            const matrixValue = connectionMatrix[i] && connectionMatrix[i][highlightedArcIndex];
+            if (matrixValue > 0) {
+              return 2; // Medium stroke for connected arcs
+            }
+          }
+        }
+        return 1;
+      })
+      .attr('stroke', (d, i) => {
+        // Enhanced stroke color for relationship chain
+        if (animationPhase === 'highlighting') {
+          if (highlightedSide === 'left' && i === highlightedArcIndex) {
+            return settings.isDarkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)';
+          }
+          // Stroke for connected arcs when right side is highlighted
+          if (highlightedSide === 'right' && highlightedArcIndex !== null) {
+            const matrixValue = connectionMatrix[i] && connectionMatrix[i][highlightedArcIndex];
+            if (matrixValue > 0) {
+              return settings.isDarkMode ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)';
+            }
+          }
+        }
+        return 'none';
+      });
+    // Create right arcs with event handlers first
+    const rightArcSelection = g.selectAll('path.right-arc')
       .data(rightArcs)
       .enter()
       .append('path')
       .attr('class', 'right-arc')
       .attr('d', d => arcGen({ startAngle: d.startAngle, endAngle: d.endAngle } as any))
       .attr('fill', (d, i) => `url(#right-arc-gradient-${i})`)
-      .attr('opacity', d => d.opacity)
-      .on('mouseenter', function(event, d) {
+      .attr('opacity', 0)
+      .on('mouseenter', function(event, d: any) {
         if (d.value === 0) return;
+        pauseAnimation('arc hover');
+        
+        // Trigger the same highlighting as auto-cycle animation
+        const arcIndex = rightArcs.findIndex(arc => arc.name === d.name);
+        console.log('🎯 Hover triggering right arc highlighting:', {
+          arcName: d.name,
+          arcIndex: arcIndex
+        });
+        
+        setAnimationPhase('highlighting');
+        setHighlightedArcIndex(arcIndex);
+        setHighlightedSide('right');
+        
         setTooltip({
           x: event.pageX,
           y: event.pageY,
@@ -598,7 +1420,72 @@ export default function ChordDiagram({
           )
         });
       })
-      .on('mouseleave', () => setTooltip(null));
+      .on('mouseleave', () => {
+        resumeAnimation('arc hover end');
+        setTooltip(null);
+        
+        // Reset highlighting when animation resumes
+        setAnimationPhase('full');
+        setHighlightedArcIndex(null);
+        setHighlightedSide(null);
+      });
+    
+    // Apply transition animations separately
+    rightArcSelection
+      .transition(transition)
+      .attr('opacity', (d, i) => {
+        // Apply full relationship chain highlighting
+        if (animationPhase === 'highlighting') {
+          if (highlightedSide === 'right') {
+            // Highlight the source arc
+            if (i === highlightedArcIndex) {
+              return 1.0; // Source arc is fully highlighted
+            }
+            return 0.4; // Dim other right arcs
+          } else if (highlightedSide === 'left' && highlightedArcIndex !== null) {
+            // When left arc is highlighted, highlight right arcs connected to it
+            const matrixValue = connectionMatrix[highlightedArcIndex] && connectionMatrix[highlightedArcIndex][i];
+            const isConnectedToHighlightedLeft = matrixValue > 0;
+            console.log(`🔗 Right arc ${i} (${rightArcs[i]?.name}) connected to left arc ${highlightedArcIndex} (${leftArcs[highlightedArcIndex]?.name})?`, 
+              isConnectedToHighlightedLeft, 'Matrix value:', matrixValue);
+            return isConnectedToHighlightedLeft ? 0.95 : 0.3; // Higher contrast
+          }
+        }
+        // Use stable base opacity without pulsing to prevent flickering
+        return Math.max(0.8, d.opacity);
+      })
+      .attr('stroke-width', (d, i) => {
+        // Enhanced stroke for relationship chain
+        if (animationPhase === 'highlighting') {
+          if (highlightedSide === 'right' && i === highlightedArcIndex) {
+            return 3; // Thickest stroke for source arc
+          }
+          // Stroke for connected arcs when left side is highlighted
+          if (highlightedSide === 'left' && highlightedArcIndex !== null) {
+            const matrixValue = connectionMatrix[highlightedArcIndex] && connectionMatrix[highlightedArcIndex][i];
+            if (matrixValue > 0) {
+              return 2; // Medium stroke for connected arcs
+            }
+          }
+        }
+        return 1;
+      })
+      .attr('stroke', (d, i) => {
+        // Enhanced stroke color for relationship chain
+        if (animationPhase === 'highlighting') {
+          if (highlightedSide === 'right' && i === highlightedArcIndex) {
+            return settings.isDarkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)';
+          }
+          // Stroke for connected arcs when left side is highlighted
+          if (highlightedSide === 'left' && highlightedArcIndex !== null) {
+            const matrixValue = connectionMatrix[highlightedArcIndex] && connectionMatrix[highlightedArcIndex][i];
+            if (matrixValue > 0) {
+              return settings.isDarkMode ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)';
+            }
+          }
+        }
+        return 'none';
+      });
 
     // Draw ribbons for connections (distributed along arc, proportional thickness)
     // Use d3.ribbon() for each connection, but set the width by using the full segment for each connection
@@ -657,15 +1544,30 @@ export default function ChordDiagram({
         }
       }
     }
-    g.selectAll('path.ribbon')
+    // Create ribbons with event handlers first
+    const ribbonSelection = g.selectAll('path.ribbon')
       .data(connections)
       .enter()
       .append('path')
       .attr('class', 'ribbon')
       .attr('d', function(d) { const path = ribbonGen({ source: d.source, target: d.target } as any); return typeof path === 'string' ? path : ''; })
       .attr('fill', d => `url(#${d.gradientId})`)
-      .attr('opacity', 0.6)
-      .on('mouseenter', function(event, d) {
+      .attr('opacity', 0)
+      .on('mouseenter', function(event: any, d: any) {
+        pauseAnimation('ribbon hover');
+        
+        // Trigger highlighting for the source side of this ribbon (same as auto-cycle)
+        console.log('🎯 Hover triggering ribbon highlighting:', {
+          leftArcName: d.left.name,
+          rightArcName: d.right.name,
+          sourceIndex: d.source.index,
+          targetIndex: d.target.index
+        });
+        
+        setAnimationPhase('highlighting');
+        setHighlightedArcIndex(d.source.index);
+        setHighlightedSide('left');
+        
         setTooltip({
           x: event.pageX,
           y: event.pageY,
@@ -679,7 +1581,53 @@ export default function ChordDiagram({
           )
         });
       })
-      .on('mouseleave', () => setTooltip(null));
+      .on('mouseleave', function(event, d) {
+        resumeAnimation('ribbon hover end');
+        setTooltip(null);
+        
+        // Reset highlighting when animation resumes
+        setAnimationPhase('full');
+        setHighlightedArcIndex(null);
+        setHighlightedSide(null);
+      });
+    
+    // Apply transition animations separately
+    ribbonSelection
+      .transition(transition)
+      .attr('opacity', d => {
+        // Highlight ribbons connected to highlighted arcs with enhanced visibility
+        if (animationPhase === 'highlighting') {
+          if (highlightedSide === 'left' && highlightedArcIndex === d.source.index) {
+            return 0.95; // Make connected ribbons very prominent
+          }
+          if (highlightedSide === 'right' && highlightedArcIndex === d.target.index) {
+            return 0.95; // Make connected ribbons very prominent
+          }
+          return 0.2; // Dim non-connected ribbons more for better contrast
+        }
+        // Use stable base opacity without pulsing
+        return settings.isDarkMode ? 0.7 : 0.6;
+      })
+      .attr('stroke-width', d => {
+        // Enhanced stroke for highlighted ribbons to show connections clearly
+        if (animationPhase === 'highlighting') {
+          if ((highlightedSide === 'left' && highlightedArcIndex === d.source.index) ||
+              (highlightedSide === 'right' && highlightedArcIndex === d.target.index)) {
+            return 2.5; // Slightly thicker for better visibility
+          }
+        }
+        return 0.5;
+      })
+      .attr('stroke', d => {
+        // Enhanced stroke color for highlighted connections
+        if (animationPhase === 'highlighting') {
+          if ((highlightedSide === 'left' && highlightedArcIndex === d.source.index) ||
+              (highlightedSide === 'right' && highlightedArcIndex === d.target.index)) {
+            return settings.isDarkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)';
+          }
+        }
+        return 'none';
+      });
 
     // --- Label placement: properly spaced around circle ---
     const labelRadius = Math.max(120, radius * 1.45); // Even more space for full text labels
@@ -734,6 +1682,7 @@ export default function ChordDiagram({
          return text;
        })
        .on('mouseenter', function(event, d) {
+         pauseAnimation('label hover');
          const fullText = (d.name || 'Unknown').toString().replace(/_/g, ' ');
          setTooltip({
            x: event.pageX,
@@ -747,7 +1696,10 @@ export default function ChordDiagram({
            )
          });
        })
-       .on('mouseleave', () => setTooltip(null));
+       .on('mouseleave', () => {
+         resumeAnimation('label hover end');
+         setTooltip(null);
+       });
 
     // Update insights
     const totalConnections = connections.reduce((sum, d) => sum + d.value, 0);
@@ -767,7 +1719,7 @@ export default function ChordDiagram({
       { title: 'Total Connections', value: totalConnections.toString() },
     ]);
 
-  }, [data, currentSource, currentTarget, rotationAngle, settings.useTestData, settings.categoryColors, isLoading, lastCategoryChange, isContainerTooSmall, chartWidth, chartHeight, showSecondaryChord]);
+  }, [data, currentSource, currentTarget, settings.useTestData, settings.categoryColors, isLoading, lastCategoryChange, isContainerTooSmall, chartWidth, chartHeight, showSecondaryChord, settings.isDarkMode]);
 
   // Render secondary chord when peak performance is involved
   useEffect(() => {

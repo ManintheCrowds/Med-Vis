@@ -1,0 +1,214 @@
+# Medtronic WE Summit Interactive Installation Brief
+
+## Project Overview
+
+An interactive data visualization installation titled "The We Are Wall - A living snapshot of us" for the Medtronic WE Summit (July 8-9, 2025) that collects demographic and personal information from attendees via mobile survey and displays connections in a visually compelling way on an LED wall. The visualization will also be featured during key moments in the main ballroom presentations.
+
+## Client Information
+
+- **Client**: Medtronic
+- **Agency**: Full Swing Productions
+- **Event**: WE Summit - DEI Conference
+- **Theme**: "WE: Include, Inspire, Innovate"
+- **Location**: Hyatt Regency Minneapolis, 1300 Nicollet Mall, Minneapolis, MN 55403
+- **Dates**: July 8-9, 2025
+- **Estimated Attendance**: 600 people
+
+## Project Goals
+
+- Create an interactive experience that visually represents diversity and connections among attendees
+- Demonstrate both unique differences and shared characteristics of participants (key message: "We are different, but we are also similar")
+- Provide an engaging, accessible experience that all attendees can easily participate in
+- Create a visual artifact that serves as a reminder of the event's message throughout the year
+- Support the event theme: "WE: Include, Inspire, Innovate"
+
+## Survey Details
+
+The mobile survey will collect the following data points:
+
+1. **Q1: How many years have you been in Medtronic?** (Determines string color)
+    - Data type: Integer ranges
+    - Options: <3 years (150 expected), 3-5 years (150), 5-10 years (150), 10-20 years (100), 20+ years (50)
+2. **Q2: What's your preferred learning style?**
+    - Data type: Categorical
+    - Options: Visual, Auditory, Reading/Writing, Kinesthetic (Doing), Interactive/Collaborative
+3. **Q3: What shaped you the most growing up?**
+    - Data type: Categorical
+    - Options: Family Traditions, Community or Neighbors, Religion or Spiritual Practices, Education or School Environment, Sports or the Arts, Personal Challenges or Adversity, Travel or Exposure to Different Cultures
+4. **Q4: Based on your personality, when do you feel you're at your peak performance?**
+    - Data type: Categorical with multiple dimensions (personality type × time of day)
+    - Options include:
+        - Extrovert, Morning: "I enjoy collaborating and brainstorming early in the day"
+        - Extrovert, Evening: "I find myself energized at night for group projects and social discussions"
+        - Introvert, Morning: "I prefer to start my day quietly, focusing on tasks without distractions"
+        - Introvert, Night: "I'm most productive at night, working independently on complex tasks"
+        - Ambivert, Morning: "I thrive in the morning, balancing independent work and social interaction"
+        - Ambivert, Night: "I work best at night when I can choose between focusing alone or collaborating"
+    - Includes definitions for personality types
+5. **Q5: What drives you or motivates you now?**
+    - Data type: Categorical
+    - Options: Making a difference, Achieving personal goals, Learning and growth, Building strong relationships, Leading or mentoring others, Finding balance or peace, Exploring new possibilities
+6. **Open-ended question: What makes you unique?**
+    - Full prompt: "There are all wonderful aspects of who you are - What makes you unique? Or what skill or attribute do you admire most about yourself? Try to summarize in 1-2 sentences."
+    - Data type: Free text (1-2 sentences)
+    - Purpose: Will be used for AI-generated poems or stories at end of session
+
+## Data Visualization Concepts
+
+To emphasize "We are different, but we are also similar":
+
+1. **Connected Constellations**
+    - Individual nodes represent each attendee
+    - Lines connect people with similar responses in specific categories
+    - Clusters form naturally around common responses
+    - Color-coding by years at Medtronic (Q1)
+    - Visualization can be rotated to highlight different dimensions
+2. **Woven Tapestry**
+    - Each response creates a thread in a larger fabric
+    - Individual threads show unique paths, but together create a cohesive pattern
+    - Thread thickness increases when multiple identical responses exist
+    - Different views can emphasize either individual stories or collective patterns
+3. **Dynamic Network**
+    - Interactive web of connections that shifts based on which question is being highlighted
+    - Animations show how the same group reconfigures when viewing different dimensions
+    - Emphasizes that we group differently based on which aspect of identity is in focus
+4. **Flowing Rivers**
+    - Sankey diagram-inspired visualization where participants flow through different response categories
+    - Shows how people with one commonality (e.g., similar motivation) might diverge in learning styles
+    - Visually demonstrates both individual journeys and common pathways
+
+## Technical Specifications
+
+### User Experience Flow
+
+1. Attendees scan QR code to access mobile form
+2. Form collects information through 5 multiple-choice questions and 1 open-ended question
+3. Submissions generate visualizations on the LED wall with animations
+4. Different views of the data can be displayed at scheduled times
+5. Aggregate visualizations exported for ballroom presentations
+6. Open-ended responses collected for AI-generated content
+
+### Installation Components
+
+1. **Mobile Survey**
+    - QR code access
+    - Multiple-choice questions with clear definitions
+    - First name input (with anonymous option)
+    - Terms acceptance with privacy notice
+    - Welcome message upon submission
+    - Accessible, user-friendly interface following Medtronic branding
+2. **Main LED Wall Visualization (16:9 ratio)**
+    - Live, continuous display throughout the event
+    - Color-coded by years at Medtronic
+    - Multiple visualization modes that can be switched manually or on schedule
+    - Animated appearance for new submissions
+    - Thicker connections for identical responses
+    - Background graphics and quotes when inactive
+3. **Ballroom Presentation Visualizations**
+    - Format: Screen captures or exported videos from main visualization
+    - Timing:
+        - Day 1: After first keynote (approx. 10:00 AM)
+        - Day 1: End of day before panel (approx. 4:00 PM)
+        - Day 2: Before Geoff's presentation (8:30 AM)
+        - Day 2: After lunch, before TED Talks (approx. 11:30 AM)
+
+## Technical Approach Options (Discovery Phase)
+
+### Option 1: TouchDesigner-Centered Approach
+
+- **Frontend**: React web app for survey
+- **Backend**: Node.js/Express for API and data management
+- **Visualization Engine**: TouchDesigner for real-time data visualization
+- **Pros**: Powerful real-time graphics, excellent for LED wall, highly customizable animations
+- **Cons**: Requires specific hardware, less portable for future use
+- **Best for**: Creating stunning visual impact, real-time transitions, complex animations
+
+### Option 2: Full Web Stack Approach
+
+- **Frontend**: React with D3.js/Three.js for visualization
+- **Backend**: Node.js/Express with MongoDB
+- **Visualization Engine**: WebGL for graphics rendering
+- **Pros**: Fully web-based, more portable, easier to repurpose
+- **Cons**: May have limitations in animation complexity
+- **Best for**: Future reusability, deployment flexibility, lower hardware requirements
+
+### Option 3: Hybrid Application Approach
+
+- **Frontend**: React Native for cross-platform survey
+- **Backend**: Firebase for real-time data synchronization
+- **Visualization Engine**: Unity for visualization with WebGL export
+- **Pros**: Strong performance, excellent for data persistence, good animation capabilities
+- **Cons**: More complex integration points
+- **Best for**: Balancing visual quality with future extensibility
+
+### Option 4: Low-Code Approach
+
+- **Frontend**: Webflow or similar for survey
+- **Backend**: Airtable or similar for data management
+- **Visualization Engine**: Observable with D3.js for visualization
+- **Pros**: Rapid development, easier client handoff, lower technical barriers
+- **Cons**: Limited customization, potential scalability issues
+- **Best for**: Quick turnaround, client editability, simpler visualizations
+
+## Detailed Workback Schedule
+
+### Phase 1: Discovery & Design (April 17-30)
+
+- April 17-19: Technical assessment and approach selection
+- April 20-23: UX/UI design for mobile survey
+- April 24-26: Visualization concept design and mockups
+- April 27-30: Client review and approval of approach
+
+### Phase 2: Development (May 1-31)
+
+- May 1-7: Survey application development
+- May 8-14: Backend and data storage setup
+- May 15-21: Initial visualization development
+- May 22-28: Integration of all components
+- May 29-31: Internal testing and bug fixes
+
+### Phase 3: Refinement (June 1-27)
+
+- June 1-12: Optimization and feature completion
+- June 13: First client review
+- June 14-17: Revisions based on feedback
+- June 18: Feedback due back
+- June 19-24: Final adjustments and polishing
+- June 25: Final client review
+- June 26-27: Final revisions and approval
+
+### Phase 4: Deployment & Event (June 28-July 9)
+
+- June 28-July 1: System packaging and deployment preparation
+- July 2: Final build goes live
+- July 3-7: Pre-event testing and contingency planning
+- July 8-9: On-site support during event
+
+## Budget
+
+$6,500 for development
+
+## Deliverables
+
+1. Mobile survey application accessible via QR code
+2. LED wall visualization system with multiple views/modes
+3. Exported visualization videos for ballroom presentation (4 times)
+4. Documentation for operating the system
+5. Data collection mechanism for open-ended responses
+6. Technical handoff for potential future reuse
+
+## Technical Considerations
+
+- Ensuring smooth real-time data flow from submissions to visualization
+- Creating a system that can handle 600 submissions over 2 days
+- Developing engaging visuals that work well both as always-on display and as presentation moments
+- Building in flexibility to sort and filter the visualization by different categories
+- Ensuring the system can operate reliably throughout the entire event
+- Creating a data export mechanism for the client to retain insights after the event
+
+## Open Questions
+
+1. Are there specific Medtronic design elements that should be incorporated into the visualizations?
+2. How to handle moderation etc. 
+
+[Medtronic Tech Stack](https://www.notion.so/Medtronic-Tech-Stack-1f2f14f4703180f79bc3c4adca5c14f7?pvs=21)

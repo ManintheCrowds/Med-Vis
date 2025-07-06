@@ -450,7 +450,6 @@ export default function AlluvialDiagram({
     console.log('🎬 Animation useEffect triggered:', {
       autoPlay,
       isAutoPlayEnabled: settings.isAutoPlayEnabled,
-      isAnimating,
       dataLength: data.length,
       svgRefExists: !!svgRef.current,
       currentSource,
@@ -469,17 +468,8 @@ export default function AlluvialDiagram({
       setIsInFullOpacityState(true);
       return;
     }
-    if (!isAnimating) {
-      console.log('❌ Animation paused');
-      if (animationRef.current.timer) {
-        clearTimeout(animationRef.current.timer);
-        animationRef.current.timer = null;
-      }
-      animationRef.current.running = false;
-      setAnimationPhase('full');
-      setIsInFullOpacityState(true);
-      return;
-    }
+    // Remove isAnimating check to prevent hover interactions from stopping the animation
+    // The animation should only be controlled by autoPlay and settings.isAutoPlayEnabled
     if (!data.length) {
       console.log('❌ No data available for animation');
       return;
@@ -519,7 +509,6 @@ export default function AlluvialDiagram({
   }, [
     autoPlay,
     settings.isAutoPlayEnabled,
-    isAnimating,
     data.length,
     currentSource // Only restart on source changes, not target changes
     // Removed startAnimation and cleanupAnimation to prevent loops
@@ -1239,7 +1228,6 @@ export default function AlluvialDiagram({
       .on('mouseenter', function(event: any, d: any) {
         // Pause animation during hover
         pauseAnimation('link hover');
-        setIsAnimating(false);
         
         // Set hover states
         setHoveredLink(d);
@@ -1262,7 +1250,6 @@ export default function AlluvialDiagram({
       .on('mouseleave', function() {
         // Resume animation
         resumeAnimation('link hover end');
-        setIsAnimating(true);
         
         // Clear hover states
         setHoveredLink(null);
@@ -1276,7 +1263,6 @@ export default function AlluvialDiagram({
       .on('mouseenter', function(event: any, d: any) {
         // Pause animation during hover
         pauseAnimation('node hover');
-        setIsAnimating(false);
         setAnimationPhase('highlighting');
         
         // Handle source node hover
@@ -1296,7 +1282,6 @@ export default function AlluvialDiagram({
       .on('mouseleave', function() {
         // Resume animation
         resumeAnimation('node hover end');
-        setIsAnimating(true);
         
         // Clear hover states
         setHoveredSourceIndex(null);
@@ -1366,7 +1351,7 @@ export default function AlluvialDiagram({
                 <strong>Highlighting:</strong>
                 <div>Source Index: {hoveredSourceIndex}</div>
                 <div>Target Index: {hoveredTargetIndex}</div>
-                <div>Animating: {isAnimating ? '✅' : '❌'}</div>
+                <div>Animating: {animationRef.current.running ? '✅' : '❌'}</div>
               </div>
             </div>
           </div>

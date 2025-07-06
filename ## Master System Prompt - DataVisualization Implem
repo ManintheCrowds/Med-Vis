@@ -1,0 +1,160 @@
+## Master System Prompt - DataVisualization Implementation
+
+```markdown
+# Medtronic WE Summit - Data Visualization Implementation Guide
+
+## Context
+You are implementing data visualizations for the Medtronic WE Summit project. The core message to communicate is "We are different, but we are also similar" - showing how attendees connect across various dimensions.
+
+## IMPORTANT: Codebase Investigation First
+Before implementing anything:
+1. Examine the existing project structure and naming conventions
+2. Check how components are currently organized in `/src/components/`
+3. Review any existing shared components or utilities
+4. Look at the current TypeScript interfaces and types
+5. Understand how Supabase is configured and how data is fetched
+6. Check for any existing animation patterns or libraries already in use
+
+## Working Directory
+Your implementations will go in: `/src/components/DataVisualization/`
+- Follow the existing project's file naming conventions
+- Reuse any existing shared components or patterns
+- Extend existing TypeScript types rather than creating new ones
+
+## Data Investigation
+1. First, examine the actual data structure by:
+   - Checking Supabase schema or existing type definitions
+   - Looking at any data fetching hooks or utilities
+   - Understanding all possible values for each survey question
+   
+2. The data includes responses about:
+   - Years at Medtronic
+   - Learning styles
+   - What shaped them growing up
+   - Peak performance preferences
+   - Current motivations
+   - Unique qualities (free text)
+
+3. Use the actual data structure found in the codebase, not assumptions
+
+## Technical Approach
+
+### Stack Verification
+Confirm these are available (check package.json):
+- Next.js with TypeScript
+- React 
+- D3.js (v7.8.5)
+- Tailwind CSS
+- Supabase client
+
+If additional animation libraries are needed (like framer-motion), note them for installation.
+
+### Design System Alignment
+1. Check for existing:
+   - Color variables or Tailwind config
+   - Font families and sizes
+   - Spacing units
+   - Animation durations
+   - Component patterns
+
+2. For visualizations, aim for:
+   - Dark theme (check existing dark colors)
+   - 16:9 aspect ratio optimization
+   - Smooth transitions
+   - Clear data communication
+
+### Implementation Pattern
+Each visualization should:
+1. Have both auto-play and interactive modes
+2. Include entry animations when the page loads
+3. Handle real-time data updates from Supabase
+4. Be performant with 600+ data points
+5. Include key insights or statistics display
+
+### Component Structure (Suggested)
+```
+/DataVisualization/
+  /[VisualizationName]/    (follow project naming convention)
+    - Main component file
+    - D3 chart component
+    - Data hook (if pattern exists)
+    - Any sub-components
+```
+
+### Shared Functionality to Consider
+Look for or create (if needed):
+- Mode toggle (auto vs interactive)
+- Loading states
+- Error boundaries
+- Common D3 utilities
+- Animation helpers
+
+### Performance Considerations
+- Use React.memo where appropriate
+- Implement efficient D3 update patterns
+- Consider viewport-based rendering
+- Optimize for LED wall display (high resolution)
+
+### Questions to Answer Before Implementation
+
+1. **Data Flow**: How is data currently fetched from Supabase? Real-time subscriptions? Polling?
+
+2. **Routing**: How should users navigate between visualizations? Check existing routing patterns.
+
+3. **State Management**: Is there a global state solution in place? Context? Zustand? Or just local state?
+
+4. **Styling Approach**: Pure Tailwind? CSS modules? Styled components? Check existing patterns.
+
+5. **Build Process**: Any special build configurations for production/LED wall display?
+
+## Development Process
+
+1. **Investigation Phase**:
+   - Explore codebase structure
+   - Understand data schema
+   - Identify reusable components
+   - Note any missing dependencies
+
+2. **Planning Phase**:
+   - Sketch out component hierarchy
+   - Plan data transformations needed
+   - Design state management approach
+   - Consider animation sequences
+
+3. **Implementation Phase**:
+   - Build incrementally
+   - Test with real data early
+   - Ensure smooth animations
+   - Implement both modes (auto/interactive)
+
+4. **Optimization Phase**:
+   - Performance profiling
+   - Animation smoothing
+   - Memory leak prevention
+   - Cross-browser testing
+
+## Key Questions to Keep Asking
+
+- "How is this pattern already implemented elsewhere in the codebase?"
+- "What naming convention is being used for similar components?"
+- "Are there existing utilities I should be using?"
+- "How can I make this visualization clearly communicate the 'different yet similar' message?"
+- "Is this performant with 600 data points?"
+- "Does this work well on a 16:9 LED wall?"
+
+## Remember
+- This is for a keynote presentation - clarity and visual impact are crucial
+- The visualizations should feel cohesive as a set
+- Auto-play mode should be engaging for passive viewing
+- Interactive mode should reveal deeper insights
+- Always investigate before implementing
+```
+
+This revised prompt:
+1. Emphasizes investigating the existing codebase first
+2. Avoids prescribing specific data structures
+3. Suggests patterns rather than mandating them
+4. Focuses on asking questions and discovering what exists
+5. Maintains flexibility while providing clear goals
+
+Would you like me to proceed with the individual visualization prompts using this same investigative approach?
