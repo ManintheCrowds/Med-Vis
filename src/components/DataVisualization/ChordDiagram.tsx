@@ -485,6 +485,14 @@ export default function ChordDiagram({
     const animate = () => {
       if (!animationRef.current.running || animationRef.current.isPaused) return;
 
+      // Safety check: prevent infinite loops
+      if (animationRef.current.cycleCount > 1000) {
+        console.log('🛑 Chord animation cycle limit reached, resetting');
+        animationRef.current.cycleCount = 0;
+        animationRef.current.currentIndex = 0;
+        animationRef.current.currentSide = 'left';
+      }
+
       // Get current data context (this will adapt to mode changes)
       const filteredData = settings.useTestData ? data : data.filter(item => !(item as any).test_data);
       
@@ -630,6 +638,14 @@ export default function ChordDiagram({
         // Call animate function directly to restart with new mode
         const animate = () => {
           if (!animationRef.current.running || animationRef.current.isPaused) return;
+
+          // Safety check: prevent infinite loops
+          if (animationRef.current.cycleCount > 1000) {
+            console.log('🛑 Chord animation cycle limit reached, resetting');
+            animationRef.current.cycleCount = 0;
+            animationRef.current.currentIndex = 0;
+            animationRef.current.currentSide = 'left';
+          }
 
           // Get current data context (this will adapt to mode changes)
           const filteredData = settings.useTestData ? data : data.filter(item => !(item as any).test_data);
@@ -1053,15 +1069,24 @@ export default function ChordDiagram({
     animationRef.current.isPaused = false;
     secondaryAnimationRef.current.isPaused = false;
     
+    // Ensure animation state is properly reset
+    if (!animationRef.current.running) {
+      console.log('🔄 Restarting chord animation after resume');
+      animationRef.current.running = true;
+      animationRef.current.currentIndex = 0;
+      animationRef.current.currentSide = 'left';
+      animationRef.current.cycleCount = 0;
+    }
+    
     // The mode change useEffect will automatically restart the animation
     // when isPaused becomes false and mode changes
   };
 
-  // Check if container is too small
+  // Check if container is too small - reduced minimum size for better compatibility
   const margin = { top: 80, right: 80, bottom: 100, left: 80 };
   const chartWidth = width - margin.left - margin.right;
   const chartHeight = height - margin.top - margin.bottom;
-  const isContainerTooSmall = chartWidth < 200 || chartHeight < 200;
+  const isContainerTooSmall = chartWidth < 100 || chartHeight < 100; // Reduced from 200x200 to 100x100
 
   // Render circular chord diagram
   useEffect(() => {
@@ -1768,7 +1793,7 @@ export default function ChordDiagram({
       <div className={`w-full h-full flex items-center justify-center ${themeClass}`} style={{ backgroundColor }}>
         <div className="text-center" style={{ color: textColor }}>
           <p className="text-lg mb-2">Container too small</p>
-          <p className="text-sm opacity-70">Minimum size: 200x200px</p>
+          <p className="text-sm opacity-70">Minimum size: 100x100px</p>
         </div>
       </div>
     );

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback, useContext } from 'react';
 import * as d3 from 'd3';
 import { sankey, sankeyLinkHorizontal } from 'd3-sankey';
 // @ts-expect-error: No types for d3-interpolate-path
@@ -52,6 +52,7 @@ interface AnimationState {
   isPaused: boolean;
   pausedAt: number;
   resumeFrom: 'source' | 'target' | null;
+  cycleCount: number;
 }
 
 interface TooltipState {
@@ -70,6 +71,16 @@ const availableFields = [
 ];
 
 const YEARS_CATEGORIES = ['0-5', '6-10', '11-15', '16-20', '20+'];
+
+// Move this function up so it is defined before use
+const getValidYearsCategory = (years: number): string => {
+  if (typeof years !== 'number' || isNaN(years) || years < 0) return '0-5';
+  if (years <= 5) return '0-5';
+  if (years <= 10) return '6-10';
+  if (years <= 15) return '11-15';
+  if (years <= 20) return '16-20';
+  return '20+';
+};
 
 // Custom wave path generator for Sankey links with bounds checking
 function sankeyLinkWave(d: any, waveAmplitude = 8, waveFrequency = 1.1, chartWidth = 800, chartHeight = 600) {
@@ -103,59 +114,31 @@ export default function AlluvialDiagram({
   autoPlay = true,
   onQuestionChange,
 }: AlluvialDiagramProps) {
-  // D3-safe margins - further reduced to prevent cropping
-  const margin = { top: 20, right: 180, bottom: 20, left: 180 };
-  const chartWidth = width - margin.left - margin.right;
-  const chartHeight = height - margin.top - margin.bottom;
+  // Responsive: use state for width/height, fallback to props
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(width);
+  const [containerHeight, setContainerHeight] = useState(height);
+
+  // Responsive: observe container size
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new window.ResizeObserver(entries => {
+      for (let entry of entries) {
+        if (entry.contentRect) {
+          setContainerWidth(entry.contentRect.width);
+          setContainerHeight(entry.contentRect.height);
+        }
+      }
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
   const svgRef = useRef<SVGSVGElement>(null);
   const { data, isLoading, error } = useVisualizationData();
   const { settings, getCurrentThemeColors } = useAppContext();
   const [currentSource, setCurrentSource] = useState('years_at_medtronic');
   const [currentTarget, setCurrentTarget] = useState('learning_style');
-  
-  // Use refs to track current values without triggering re-renders
-  const currentSourceRef = useRef(currentSource);
-  const currentTargetRef = useRef(currentTarget);
-  
-  // Update refs when state changes
-  useEffect(() => {
-    currentSourceRef.current = currentSource;
-  }, [currentSource]);
-  
-  useEffect(() => {
-    currentTargetRef.current = currentTarget;
-  }, [currentTarget]);
-  const [insights, setInsights] = useState<Array<{ title: string; value: string | number; description?: string }>>([]);
-  const [hoveredNode, setHoveredNode] = useState<SankeyNode | null>(null);
-  const [hoveredLink, setHoveredLink] = useState<SankeyLink | null>(null);
-  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
-  const [lastCategoryChange, setLastCategoryChange] = useState<{ source: string; target: string }>({ source: currentSource, target: currentTarget });
-  const [currentTargetIndex, setCurrentTargetIndex] = useState<number>(0);
-  const [isAnimating, setIsAnimating] = useState(true);
-  const [hoveredSourceIndex, setHoveredSourceIndex] = useState<number | null>(null);
-  const [hoveredTargetIndex, setHoveredTargetIndex] = useState<number | null>(null);
-  const [isInFullOpacityState, setIsInFullOpacityState] = useState(false);
-  const [animationPhase, setAnimationPhase] = useState<'full' | 'highlighting' | 'transitioning'>('full');
-
-  const animationRef = useRef<AnimationState>({
-    timer: null,
-    running: false,
-    currentSourceIndex: 0,
-    currentTargetIndex: 0,
-    isPaused: false,
-    pausedAt: Date.now(),
-    resumeFrom: null
-  });
-
-  // Validate years value
-  const getValidYearsCategory = (years: number): string => {
-    if (typeof years !== 'number' || isNaN(years) || years < 0) return '0-5';
-    if (years <= 5) return '0-5';
-    if (years <= 10) return '6-10';
-    if (years <= 15) return '11-15';
-    if (years <= 20) return '16-20';
-    return '20+';
-  };
 
   // Filter data based on test data setting
   const filteredData = useMemo(() => {
@@ -199,6 +182,120 @@ export default function AlluvialDiagram({
     }
   }, [filteredData, currentTarget]);
 
+  // --- Responsive chart sizing based on data size ---
+  // Set sensible min/max chart dimensions
+  const MIN_CHART_HEIGHT = 180;
+  const MAX_CHART_HEIGHT = 700;
+  const MIN_CHART_WIDTH = 320;
+  const MAX_CHART_WIDTH = 1400;
+
+  // Calculate node count for sizing
+  const nodeCount = Math.max(sources.length, targets.length, 1);
+  // Calculate available height for nodes and paddings
+  let availableHeight = Math.max(MIN_CHART_HEIGHT, Math.min(containerHeight - 40, MAX_CHART_HEIGHT));
+  // For very sparse data, shrink the chart height
+  if (nodeCount <= 3) {
+    availableHeight = Math.max(MIN_CHART_HEIGHT, Math.min(320, availableHeight));
+  }
+  // For very dense data, allow more height
+  if (nodeCount >= 10) {
+    availableHeight = Math.min(MAX_CHART_HEIGHT, Math.max(availableHeight, 500));
+  }
+
+  // Node height and padding logic
+  const minNodeHeight = 16;
+  const maxNodeHeight = nodeCount <= 3 ? 36 : 48; // Smaller max for sparse data
+  const minPadding = 8;
+  let nodeHeight = Math.floor((availableHeight - (nodeCount + 1) * minPadding) / nodeCount);
+  nodeHeight = Math.max(minNodeHeight, Math.min(nodeHeight, maxNodeHeight));
+  let nodePadding = (availableHeight - nodeCount * nodeHeight) / (nodeCount + 1);
+  nodePadding = Math.max(nodePadding, minPadding);
+
+  // Dynamically scale label font size with node height (clamp between 12px and 28px)
+  const labelFontSize = Math.max(12, Math.min(28, Math.floor(nodeHeight * 0.5)));
+
+  // --- Dynamic margin calculation for full label visibility ---
+  // Helper to measure text width in px
+  function measureTextWidth(text: string, font: string): number {
+    if (typeof window === 'undefined') return 100; // fallback for SSR
+    if (!(measureTextWidth as any)._canvas) {
+      (measureTextWidth as any)._canvas = document.createElement('canvas');
+    }
+    const canvas = (measureTextWidth as any)._canvas as HTMLCanvasElement;
+    const context = canvas.getContext('2d');
+    if (!context) return 100;
+    context.font = font;
+    return context.measureText(text).width;
+  }
+
+  // Font for measuring
+  const labelFont = `bold ${labelFontSize}px Avenir Next World, -apple-system, BlinkMacSystemFont, 'SF Pro', 'Roboto', sans-serif`;
+  const allLabels = [...sources, ...targets];
+  const labelWidths = allLabels.map(label => measureTextWidth(label, labelFont));
+  const maxLabelWidth = Math.max(...labelWidths, 80); // fallback min
+  const labelPadding = 24;
+  const margin = { top: 20, right: maxLabelWidth + labelPadding, bottom: 20, left: maxLabelWidth + labelPadding };
+
+  // Responsive chart width
+  let chartWidth = Math.max(MIN_CHART_WIDTH, Math.min(containerWidth - margin.left - margin.right, MAX_CHART_WIDTH));
+  let chartHeight = availableHeight;
+
+  // If very sparse, shrink width too
+  if (nodeCount <= 3) {
+    chartWidth = Math.max(MIN_CHART_WIDTH, Math.min(chartWidth, 480));
+  }
+
+  // If very dense, allow more width
+  if (nodeCount >= 10) {
+    chartWidth = Math.min(MAX_CHART_WIDTH, Math.max(chartWidth, 900));
+  }
+
+  // Debug logging
+  useEffect(() => {
+    console.log('[AlluvialDiagram Debug]');
+    console.log('  Container:', containerWidth, 'x', containerHeight);
+    console.log('  Chart:', chartWidth, 'x', chartHeight);
+    console.log('  Node count (sources/targets):', sources.length, targets.length);
+    console.log('  nodeHeight:', nodeHeight);
+    console.log('  nodePadding:', nodePadding);
+    console.log('  labelFontSize:', labelFontSize);
+  }, [containerWidth, containerHeight, chartWidth, chartHeight, sources.length, targets.length, nodeHeight, nodePadding, labelFontSize]);
+
+  // Use refs to track current values without triggering re-renders
+  const currentSourceRef = useRef(currentSource);
+  const currentTargetRef = useRef(currentTarget);
+  
+  // Update refs when state changes
+  useEffect(() => {
+    currentSourceRef.current = currentSource;
+  }, [currentSource]);
+  
+  useEffect(() => {
+    currentTargetRef.current = currentTarget;
+  }, [currentTarget]);
+  const [insights, setInsights] = useState<Array<{ title: string; value: string | number; description?: string }>>([]);
+  const [hoveredNode, setHoveredNode] = useState<SankeyNode | null>(null);
+  const [hoveredLink, setHoveredLink] = useState<SankeyLink | null>(null);
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+  const [lastCategoryChange, setLastCategoryChange] = useState<{ source: string; target: string }>({ source: currentSource, target: currentTarget });
+  const [currentTargetIndex, setCurrentTargetIndex] = useState<number>(0);
+  const [isAnimating, setIsAnimating] = useState(true);
+  const [hoveredSourceIndex, setHoveredSourceIndex] = useState<number | null>(null);
+  const [hoveredTargetIndex, setHoveredTargetIndex] = useState<number | null>(null);
+  const [isInFullOpacityState, setIsInFullOpacityState] = useState(false);
+  const [animationPhase, setAnimationPhase] = useState<'full' | 'highlighting' | 'transitioning'>('full');
+
+  const animationRef = useRef<AnimationState>({
+    timer: null,
+    running: false,
+    currentSourceIndex: 0,
+    currentTargetIndex: 0,
+    isPaused: false,
+    pausedAt: Date.now(),
+    resumeFrom: null,
+    cycleCount: 0
+  });
+
   // Check for reduced motion preference
   const prefersReducedMotion = useMemo(() => {
     if (typeof window === 'undefined') return false;
@@ -216,30 +313,6 @@ export default function AlluvialDiagram({
       linkTransitionDuration: prefersReducedMotion ? 400 : 750
     };
   }, [settings.autoPlaySpeed, prefersReducedMotion]);
-
-  // Cleanup function inlined in useEffect to prevent dependency issues
-
-  // Visibility change handler temporarily disabled to ensure smooth animation
-  // TODO: Re-enable with proper focus detection later if needed
-  // useEffect(() => {
-  //   if (typeof window === 'undefined') return;
-  //   function handleVisibilityChange() {
-  //     if (document.hidden && animationRef.current.running) {
-  //       console.log('🚫 Page hidden, pausing animation');
-  //       if (animationRef.current.timer) {
-  //         clearTimeout(animationRef.current.timer);
-  //         animationRef.current.timer = null;
-  //       }
-  //       animationRef.current.running = false;
-  //       setAnimationPhase('full');
-  //       setIsInFullOpacityState(true);
-  //     }
-  //   }
-  //   document.addEventListener('visibilitychange', handleVisibilityChange);
-  //   return () => {
-  //     document.removeEventListener('visibilitychange', handleVisibilityChange);
-  //   };
-  // }, []);
 
   // Get visual order of source nodes (top-to-bottom as they appear)
   const sortedSources = useMemo(() => {
@@ -282,8 +355,8 @@ export default function AlluvialDiagram({
     const links = Array.from(linksMap.values());
     const sankeyGenerator = sankey<any, any>()
       .nodeId((d: any) => d.id)
-      .nodeWidth(24)
-      .nodePadding(24)
+      .nodeWidth(12)
+      .nodePadding(nodePadding)
       .extent([[0, 0], [chartWidth, chartHeight]]);
 
     const sankeyData = sankeyGenerator({
@@ -297,7 +370,7 @@ export default function AlluvialDiagram({
       .sort((a: any, b: any) => a.y0 - b.y0);
 
     return sourceNodes.map((d: any) => d.name);
-  }, [filteredData, sources, targets, currentSource, currentTarget, chartWidth, chartHeight]);
+  }, [filteredData, sources, targets, currentSource, currentTarget, chartWidth, chartHeight, nodePadding]);
 
   // Enhanced animation function with comprehensive debug tracking
   const animate = useCallback(() => {
@@ -314,6 +387,17 @@ export default function AlluvialDiagram({
       });
       return;
     }
+
+    // Safety check: prevent infinite loops
+    if (animationRef.current.cycleCount > 1000) {
+      console.log('🛑 Animation cycle limit reached, resetting');
+      animationRef.current.cycleCount = 0;
+      animationRef.current.currentSourceIndex = 0;
+      animationRef.current.currentTargetIndex = 0;
+    }
+
+    // Increment cycle counter
+    animationRef.current.cycleCount++;
 
     // Set animation phase to highlighting
     setAnimationPhase('highlighting');
@@ -380,6 +464,13 @@ export default function AlluvialDiagram({
           // Still have more target categories to cycle through
           const targetProgress = `${animationRef.current.currentTargetIndex + 2}/${targetOptions.length}`;
           console.log(`🔄 ✅ COMPLETED ALL SOURCES for '${currentTargetRef.current}', moving to next target (${targetProgress})`);
+          
+          // Clear any existing timer to prevent conflicts
+          if (animationRef.current.timer) {
+            clearTimeout(animationRef.current.timer);
+            animationRef.current.timer = null;
+          }
+          
           animationRef.current.timer = setTimeout(() => {
             if (!animationRef.current.running || animationRef.current.isPaused) return;
             setAnimationPhase('transitioning');
@@ -394,23 +485,30 @@ export default function AlluvialDiagram({
               currentTargetIndex: animationRef.current.currentTargetIndex,
               allTargetOptions: targetOptions
             });
-          setCurrentTarget(nextTarget);
+            setCurrentTarget(nextTarget);
             setLastCategoryChange({ source: currentSourceRef.current, target: nextTarget });
             onQuestionChange?.(currentSourceRef.current, nextTarget);
           
-          // Reset source index and restart with new target
-          animationRef.current.currentSourceIndex = 0;
-          
-          // Start the next cycle after a brief pause
-          animationRef.current.timer = setTimeout(() => {
-            if (animationRef.current.running && !animationRef.current.isPaused) {
-              animate();
-            }
+            // Reset source index and restart with new target
+            animationRef.current.currentSourceIndex = 0;
+            
+            // Start the next cycle after a brief pause
+            setTimeout(() => {
+              if (animationRef.current.running && !animationRef.current.isPaused) {
+                animate();
+              }
+            }, animationDurations.categoryPauseDuration);
           }, animationDurations.categoryPauseDuration);
-        }, animationDurations.categoryPauseDuration);
               } else {
           // We've cycled through all targets, now change the source category
           console.log(`🔄 ✨ COMPLETED ALL TARGETS for '${currentSourceRef.current}' - Moving to next source category! ✨`);
+          
+          // Clear any existing timer to prevent conflicts
+          if (animationRef.current.timer) {
+            clearTimeout(animationRef.current.timer);
+            animationRef.current.timer = null;
+          }
+          
           animationRef.current.timer = setTimeout(() => {
             if (!animationRef.current.running || animationRef.current.isPaused) return;
             setAnimationPhase('transitioning');
@@ -440,13 +538,13 @@ export default function AlluvialDiagram({
             setLastCategoryChange({ source: nextSource, target: firstTarget });
             onQuestionChange?.(nextSource, firstTarget);
           
-          // Start the next cycle after a longer pause
-          animationRef.current.timer = setTimeout(() => {
-            if (animationRef.current.running && !animationRef.current.isPaused) {
-              animate();
-            }
-          }, animationDurations.categoryPauseDuration * 1.5); // Longer pause for source category change
-        }, animationDurations.categoryPauseDuration);
+            // Start the next cycle after a longer pause
+            setTimeout(() => {
+              if (animationRef.current.running && !animationRef.current.isPaused) {
+                animate();
+              }
+            }, animationDurations.categoryPauseDuration * 1.5); // Longer pause for source category change
+          }, animationDurations.categoryPauseDuration);
       }
     }
   }, [
@@ -523,6 +621,7 @@ export default function AlluvialDiagram({
       animationRef.current.running = true;
       animationRef.current.currentSourceIndex = 0;
       animationRef.current.currentTargetIndex = 0;
+      animationRef.current.cycleCount = 0; // Reset cycle counter
 
       // Start animation
       animate();
@@ -550,6 +649,33 @@ export default function AlluvialDiagram({
   const nodeLabelFontFamily = 'Avenir Next World, -apple-system, BlinkMacSystemFont, "SF Pro", "Roboto", sans-serif';
   const nodeLabelOffset = 24;
 
+  // Local debug toggle for this component if no global admin context
+  const [localDebug, setLocalDebug] = useState(false);
+  const [showThemeToggle, setShowThemeToggle] = useState(false);
+  const debugOn = localDebug;
+
+  // Debug Sankey data for outlines
+  const [debugSankeyData, setDebugSankeyData] = useState<any>(null);
+  useEffect(() => {
+    if (!Array.isArray(sources) || !Array.isArray(targets)) return;
+    const nodes = [
+      ...sources.map((name) => ({ id: `source:${name}`, name, category: 'source' })),
+      ...targets.map((name) => ({ id: `target:${name}`, name, category: 'target' })),
+    ];
+    // Only create links if both sides have at least one node
+    const links = (sources.length && targets.length)
+      ? [{ source: `source:${sources[0]}`, target: `target:${targets[0]}`, value: 1 }]
+      : [];
+    if (nodes.length < 2 || links.length < 1) return; // Prevent invalid array length
+    const sankeyGenerator = sankey<any, any>()
+      .nodeId((d: any) => d.id)
+      .nodeWidth(12)
+      .nodePadding(nodePadding)
+      .extent([[0, 0], [chartWidth, chartHeight]]);
+    const sankeyData = sankeyGenerator({ nodes: nodes.map((d) => ({ ...d })), links: links.map((d) => ({ ...d })) });
+    setDebugSankeyData(sankeyData);
+  }, [sources, targets, chartWidth, chartHeight, nodePadding]);
+
   // Render Sankey diagram
   useEffect(() => {
     if (!svgRef.current || !filteredData.length) return;
@@ -558,18 +684,26 @@ export default function AlluvialDiagram({
     const svg = d3.select<SVGSVGElement, unknown>(svgRef.current);
     svg.selectAll('*').remove(); // Clear previous content
     svg
-      .attr('width', width)
-      .attr('height', height);
+      .attr('width', containerWidth)
+      .attr('height', containerHeight);
 
-    // Create a group for the chart area with margin translation
-    const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+    // --- Sankey node/link creation and vertical centering (deduplicated) ---
+    // Sort source nodes to maintain a fixed order (same as animation)
+    const sortedSources = [...sources];
+    if (currentSource === 'years_at_medtronic') {
+      sortedSources.sort((a, b) => YEARS_CATEGORIES.indexOf(a) - YEARS_CATEGORIES.indexOf(b));
+    } else {
+      sortedSources.sort();
+    }
+    // Sort target nodes to maintain a fixed order
+    const sortedTargets = [...targets];
+    if (currentTarget === 'years_at_medtronic') {
+      sortedTargets.sort((a, b) => YEARS_CATEGORIES.indexOf(a) - YEARS_CATEGORIES.indexOf(b));
+    } else {
+      sortedTargets.sort();
+    }
 
-    let defs = svg.select<SVGDefsElement>('defs');
-    if (defs.empty()) defs = svg.append('defs') as d3.Selection<SVGDefsElement, unknown, null, undefined>;
-    let linksG = g.append('g').attr('class', 'links');
-    let nodesG = g.append('g').attr('class', 'nodes');
-
-    // Sankey transformation
+    // Sankey transformation accessors
     const sourceAccessor = (d: any) =>
       currentSource === 'years_at_medtronic'
         ? getYearsCategory(d.years_at_medtronic || 0)
@@ -579,91 +713,78 @@ export default function AlluvialDiagram({
         ? getYearsCategory(d.years_at_medtronic || 0)
         : (d as any)[currentTarget];
 
-    // Sort source nodes to maintain a fixed order (same as animation)
-    const sortedSources = [...sources];
-    if (currentSource === 'years_at_medtronic') {
-      sortedSources.sort((a, b) => YEARS_CATEGORIES.indexOf(a) - YEARS_CATEGORIES.indexOf(b));
-    } else {
-      sortedSources.sort();
-    }
-
-    // Sort target nodes to maintain a fixed order
-    const sortedTargets = [...targets];
-    if (currentTarget === 'years_at_medtronic') {
-      sortedTargets.sort((a, b) => YEARS_CATEGORIES.indexOf(a) - YEARS_CATEGORIES.indexOf(b));
-    } else {
-      sortedTargets.sort();
-    }
-
-    // Filter data to only include valid values (no additional filtering for peak_performance)
+    // Filter data to only include valid values
     const validData = filteredData.filter(d =>
       (currentSource !== 'years_at_medtronic' || d.years_at_medtronic !== null) &&
       (currentTarget !== 'years_at_medtronic' || d.years_at_medtronic !== null)
     );
 
-    // 2. Build nodes array with unique ids (using sorted arrays)
+    // Build nodes array with unique ids
     const nodes = [
       ...sortedSources.map((name) => ({ id: `${currentSource}:${name}`, name, category: currentSource })),
       ...sortedTargets.map((name) => ({ id: `${currentTarget}:${name}`, name, category: currentTarget })),
     ];
 
-    // 3. Build links array (aggregate counts for each source-target pair)
+    // Build links array (aggregate counts for each source-target pair)
     const linksMap = new Map<string, { source: string; target: string; value: number, isDummy?: boolean }>();
+    // 1. For every possible source-target pair, create a link (dummy if no data)
+    sortedSources.forEach((source) => {
+      sortedTargets.forEach((target) => {
+        const sourceId = `${currentSource}:${source}`;
+        const targetId = `${currentTarget}:${target}`;
+        const key = `${sourceId}→${targetId}`;
+        linksMap.set(key, { source: sourceId, target: targetId, value: 0, isDummy: true });
+      });
+    });
+    // 2. Fill in real data, marking links as not dummy
     validData.forEach((d) => {
       const source = sourceAccessor(d);
       const target = targetAccessor(d);
+      if (!sortedSources.includes(source) || !sortedTargets.includes(target)) return;
       const sourceId = `${currentSource}:${source}`;
       const targetId = `${currentTarget}:${target}`;
-      if (!sortedSources.includes(source) || !sortedTargets.includes(target)) return; // Exclude invalid
       const key = `${sourceId}→${targetId}`;
       if (!linksMap.has(key)) {
-        linksMap.set(key, { source: sourceId, target: targetId, value: 0 });
-      }
-      linksMap.get(key)!.value += 1;
-    });
-    // Add dummy links for target categories with no incoming links
-    const targetNodeIds = sortedTargets.map((name) => `${currentTarget}:${name}`);
-    const sourceNodeIds = sortedSources.map((name) => `${currentSource}:${name}`);
-    // Add a hidden dummy source node if needed
-    const DUMMY_SOURCE_ID = '__dummy_source__';
-    const DUMMY_TARGET_ID = '__dummy_target__';
-    let dummySourceNodeAdded = false;
-    let dummyTargetNodeAdded = false;
-    targetNodeIds.forEach((targetId) => {
-      const hasIncoming = Array.from(linksMap.values()).some((l) => l.target === targetId);
-      if (!hasIncoming) {
-        // Add dummy source node if not already present
-        if (!dummySourceNodeAdded) {
-          nodes.unshift({ id: DUMMY_SOURCE_ID, name: '', category: '__dummy__' });
-          dummySourceNodeAdded = true;
-        }
-        linksMap.set(`${DUMMY_SOURCE_ID}→${targetId}`, { source: DUMMY_SOURCE_ID, target: targetId, value: 0.0001, isDummy: true });
+        linksMap.set(key, { source: sourceId, target: targetId, value: 1, isDummy: false });
+      } else {
+        const link = linksMap.get(key)!;
+        link.value += 1;
+        link.isDummy = false;
       }
     });
-    // Add dummy links for source categories with no outgoing links
-    sourceNodeIds.forEach((sourceId) => {
-      const hasOutgoing = Array.from(linksMap.values()).some((l) => l.source === sourceId);
-      if (!hasOutgoing) {
-        // Add dummy target node if not already present
-        if (!dummyTargetNodeAdded) {
-          nodes.push({ id: DUMMY_TARGET_ID, name: '', category: '__dummy__' });
-          dummyTargetNodeAdded = true;
-        }
-        linksMap.set(`${sourceId}→${DUMMY_TARGET_ID}`, { source: sourceId, target: DUMMY_TARGET_ID, value: 0.0001, isDummy: true });
-      }
+    // 3. Set dummy links to a very small value if still dummy
+    Array.from(linksMap.values()).forEach(link => {
+      if (link.isDummy) link.value = 0.0001;
     });
+
     const links = Array.from(linksMap.values());
 
-    // 4. Sankey layout with nodeId accessor and improved bounds handling
+    // Sankey layout
     const sankeyGenerator = sankey<any, any>()
       .nodeId((d: any) => d.id)
-      .nodeWidth(24)
-      .nodePadding(24)
+      .nodeWidth(12)
+      .nodePadding(nodePadding)
       .extent([[0, 0], [chartWidth, chartHeight]]);
+
     const sankeyData = sankeyGenerator({
       nodes: nodes.map((d) => ({ ...d })),
       links: links.map((d) => ({ ...d })),
     });
+
+    // Compute vertical offset to center the diagram
+    const nodeYs = sankeyData.nodes.map((d: any) => [d.y0, d.y1]).flat();
+    const minY = Math.min(...nodeYs);
+    const maxY = Math.max(...nodeYs);
+    const usedHeight = maxY - minY;
+    const offsetY = Math.max(0, (chartHeight - usedHeight) / 2 - minY);
+
+    // Create a group for the chart area with margin translation and vertical centering
+    const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top + offsetY})`);
+
+    let defs = svg.select<SVGDefsElement>('defs');
+    if (defs.empty()) defs = svg.append('defs') as d3.Selection<SVGDefsElement, unknown, null, undefined>;
+    let linksG = g.append('g').attr('class', 'links');
+    let nodesG = g.append('g').attr('class', 'nodes');
 
     // Remove old gradients (no longer needed)
     defs.selectAll('linearGradient.link-gradient').remove();
@@ -699,7 +820,8 @@ export default function AlluvialDiagram({
     }
 
     // --- Links update pattern ---
-    const filteredLinks = sankeyData.links.filter((d: any) => d.source.id !== DUMMY_SOURCE_ID && d.target.id !== DUMMY_TARGET_ID);
+    // All links are now between real nodes, with isDummy property for visual distinction
+    const filteredLinks = sankeyData.links;
     // Remove mix-blend-mode in dark mode to prevent color washing out
     linksG.style('mix-blend-mode', settings.isDarkMode ? 'normal' : 'multiply');
     const linkKey = (d: any) => `${d.source.id}→${d.target.id}`;
@@ -720,8 +842,8 @@ export default function AlluvialDiagram({
       .data(filteredLinks, linkKey)
       .enter()
       .append('path')
-      .attr('d', (d: any) => sankeyLinkWave(d, 8, 1.1, chartWidth, chartHeight))
-              .attr('stroke', (d: any) => getNodeColor(d.source, getCurrentThemeColors(), settings.isDarkMode))
+      .attr('d', (d: any) => sankeyLinkHorizontal()(d))
+      .attr('stroke', (d: any) => getNodeColor(d.source, getCurrentThemeColors(), settings.isDarkMode))
       .attr('stroke-width', (d: any) => Math.max(settings.isDarkMode ? 2 : 1, d.width))
       .attr('fill', 'none')
       .attr('filter', (d: any) => {
@@ -731,28 +853,27 @@ export default function AlluvialDiagram({
       .attr('pointer-events', 'all')
       .attr('stroke-linecap', 'round')
       .attr('opacity', (d: any) => {
+        // Dummy links: very low opacity
+        if (d.isDummy) return 0.08;
         // Adjust opacity based on dark mode for better visibility
         const baseOpacity = settings.isDarkMode ? 0.85 : 0.4;
         const highlightOpacity = settings.isDarkMode ? 1.0 : 0.9;
         const dimOpacity = settings.isDarkMode ? 0.4 : 0.1;
-
         // Default opacity when no highlighting
         if (animationPhase !== 'highlighting') return baseOpacity;
-
         // Highlight links from the active source
         if (hoveredSourceIndex !== null) {
           const hoveredSource = sortedSources[hoveredSourceIndex];
           return d.source.name === hoveredSource ? highlightOpacity : dimOpacity;
         }
-
         // Highlight links to the active target
         if (hoveredTargetIndex !== null) {
           const hoveredTarget = sortedTargets[hoveredTargetIndex];
           return d.target.name === hoveredTarget ? highlightOpacity : dimOpacity;
         }
-
         return baseOpacity;
-      });
+      })
+      .attr('stroke-dasharray', (d: any) => d.isDummy ? '4,4' : null); // Dashed for dummy links
 
     // Apply drawing animation only on category changes to prevent flickering
     if (isCategoryChange) {
@@ -838,16 +959,16 @@ export default function AlluvialDiagram({
     // --- Nodes update pattern (rects) ---
 
 
-    const filteredNodes = sankeyData.nodes.filter((d: any) => d.id !== DUMMY_SOURCE_ID && d.id !== DUMMY_TARGET_ID);
+    const filteredNodes = sankeyData.nodes;
     const nodeSel = nodesG.selectAll('rect')
       .data(filteredNodes, (d: any) => d.id);
     nodeSel.exit().remove();
     nodeSel.join(
       enter => enter.append('rect')
-        .attr('x', (d: any) => Math.max(0, Math.min(chartWidth - (d.x1 - d.x0), d.x0)))
-        .attr('y', (d: any) => Math.max(0, Math.min(chartHeight - (d.y1 - d.y0), d.y0)))
-        .attr('height', (d: any) => (d.value === 0 ? 0.0001 : Math.min(chartHeight, d.y1 - d.y0)))
-        .attr('width', (d: any) => Math.min(chartWidth, d.x1 - d.x0))
+        .attr('x', (d: any) => d.x0)
+        .attr('y', (d: any) => d.y0)
+        .attr('height', (d: any) => d.y1 - d.y0)
+        .attr('width', (d: any) => d.x1 - d.x0)
         .attr('fill', (d: any) => getNodeColor(d, getCurrentThemeColors(), settings.isDarkMode))
         .attr('stroke', settings.isDarkMode ? '#444' : '#22223b')
         .attr('opacity', (d: any) => {
@@ -912,10 +1033,10 @@ export default function AlluvialDiagram({
         }),
       update => update
         .transition(d3.transition().duration(750).ease(d3.easeCubicInOut))
-        .attr('x', (d: any) => Math.max(0, Math.min(chartWidth - (d.x1 - d.x0), d.x0)))
-        .attr('y', (d: any) => Math.max(0, Math.min(chartHeight - (d.y1 - d.y0), d.y0)))
-        .attr('height', (d: any) => (d.value === 0 ? 0.0001 : Math.min(chartHeight, d.y1 - d.y0)))
-        .attr('width', (d: any) => Math.min(chartWidth, d.x1 - d.x0))
+        .attr('x', (d: any) => d.x0)
+        .attr('y', (d: any) => d.y0)
+        .attr('height', (d: any) => d.y1 - d.y0)
+        .attr('width', (d: any) => d.x1 - d.x0)
         .attr('fill', (d: any) => getNodeColor(d, getCurrentThemeColors(), settings.isDarkMode))
         .attr('opacity', (d: any) => {
           // Source nodes: only the highlighted one is bright
@@ -950,13 +1071,13 @@ export default function AlluvialDiagram({
       if (sourceNodeSet.has(node.name)) {
         labelLayer
           .append('text')
-          .attr('x', node.x0 - nodeLabelOffset)
+          .attr('x', -labelPadding)
           .attr('y', (node.y0 + node.y1) / 2)
           .attr('text-anchor', 'end')
           .attr('alignment-baseline', 'middle')
           .attr('font-family', nodeLabelFontFamily)
           .attr('font-weight', nodeLabelFontWeight)
-          .attr('font-size', nodeLabelFontSize)
+          .attr('font-size', labelFontSize)
           .attr('fill', nodeLabelColor)
           .attr('aria-label', node.name)
           .attr('opacity', node.value === 0 ? 0.5 : 1)
@@ -967,13 +1088,13 @@ export default function AlluvialDiagram({
       if (targetNodeSet.has(node.name)) {
         labelLayer
           .append('text')
-          .attr('x', node.x1 + nodeLabelOffset)
+          .attr('x', chartWidth + labelPadding)
           .attr('y', (node.y0 + node.y1) / 2)
           .attr('text-anchor', 'start')
           .attr('alignment-baseline', 'middle')
           .attr('font-family', nodeLabelFontFamily)
           .attr('font-weight', nodeLabelFontWeight)
-          .attr('font-size', nodeLabelFontSize)
+          .attr('font-size', labelFontSize)
           .attr('fill', nodeLabelColor)
           .attr('aria-label', node.name)
           .attr('opacity', node.value === 0 ? 0.5 : 1)
@@ -1003,7 +1124,7 @@ export default function AlluvialDiagram({
       .attr('width', (d: any) => d.x1 - d.x0)
       .attr('fill', (d: any) => getNodeColor(d, getCurrentThemeColors(), settings.isDarkMode));
 
-  }, [filteredData, currentSource, currentTarget, width, height, settings.categoryColors, settings.isDarkMode, lastCategoryChange, getCurrentThemeColors]);
+  }, [filteredData, currentSource, currentTarget, containerWidth, containerHeight, settings.categoryColors, settings.isDarkMode, lastCategoryChange, getCurrentThemeColors]);
 
   // Create sorted targets for consistent highlighting
   const sortedTargetsForHighlight = useMemo(() => {
@@ -1183,8 +1304,8 @@ export default function AlluvialDiagram({
       const links = Array.from(linksMap.values());
       const sankeyGenerator = sankey<any, any>()
         .nodeId((d: any) => d.id)
-        .nodeWidth(24)
-        .nodePadding(24)
+        .nodeWidth(12)
+        .nodePadding(nodePadding)
         .extent([[0, 0], [chartWidth, chartHeight]]);
       const sankeyData = sankeyGenerator({
         nodes: nodes.map((d) => ({ ...d })),
@@ -1197,7 +1318,7 @@ export default function AlluvialDiagram({
         .map((d: any) => d.name);
     }
     return visualOrder.length ? visualOrder : [...sources];
-  }, [filteredData, currentSource, currentTarget, sources, targets, chartWidth, chartHeight]);
+  }, [filteredData, currentSource, currentTarget, sources, targets, chartWidth, chartHeight, nodePadding]);
 
   // Determine which source or target to highlight based on animation state
   let highlightSourceName: string | null = null;
@@ -1242,8 +1363,12 @@ export default function AlluvialDiagram({
       animationRef.current.isPaused = false;
       animationRef.current.resumeFrom = 'source';
       
-      // Resume animation from current position
-      animate();
+      // Resume animation from current position with a small delay to ensure state is updated
+      setTimeout(() => {
+        if (animationRef.current.running && !animationRef.current.isPaused) {
+          animate();
+        }
+      }, 100);
     }
   }, [animate]);
 
@@ -1337,77 +1462,72 @@ export default function AlluvialDiagram({
   }, [filteredData, hoveredSourceIndex, hoveredTargetIndex, animationPhase, sortedSources, targets, currentSource, currentTarget]);
 
   return (
-    <div className={`w-full h-full flex flex-col items-start justify-start transition-colors duration-200 ${
-      settings.isDarkMode ? 'bg-gray-900' : 'bg-white'
-    }`}>
-      {/* Question Selector - Reduced top padding to move visualization higher */}
-      <div className="w-full flex flex-col items-center justify-start pt-4 pb-6 mb-4" style={{ zIndex: 1000 }}>
-        <QuestionSelector
-          availableFields={availableFields}
-          currentSource={currentSource}
-          currentTarget={currentTarget}
-          onChange={(source, target) => {
-            setCurrentSource(source);
-            setCurrentTarget(target);
-            setLastCategoryChange({ source, target });
-          }}
-        />
-      </div>
-      
-      {/* Debug Panel - Disabled for production */}
-      {false && (
-        <div className="w-full px-4 mb-4">
-          <div className={`p-3 rounded text-xs font-mono transition-colors duration-200 ${
-            settings.isDarkMode ? 'bg-gray-800 text-gray-100' : 'bg-gray-100 text-gray-900'
-          }`}>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <strong>Animation State:</strong>
-                <div>Running: {animationRef.current.running ? '✅' : '❌'}</div>
-                <div>Paused: {animationRef.current.isPaused ? '⏸️' : '▶️'}</div>
-                <div>Phase: {animationPhase}</div>
-              </div>
-              <div>
-                <strong>Current Position:</strong>
-                <div>Source: {sortedSources[animationRef.current.currentSourceIndex] || 'N/A'} ({animationRef.current.currentSourceIndex + 1}/{sortedSources.length})</div>
-                <div>Target: {currentTarget} ({animationRef.current.currentTargetIndex + 1}/{availableFields.filter(f => f.value !== currentSource).length})</div>
-              </div>
-              <div>
-                <strong>Categories:</strong>
-                <div>{currentSource} → {currentTarget}</div>
-                <div>Sources: {sortedSources.join(', ')}</div>
-              </div>
-              <div>
-                <strong>Highlighting:</strong>
-                <div>Source Index: {hoveredSourceIndex}</div>
-                <div>Target Index: {hoveredTargetIndex}</div>
-                <div>Animating: {animationRef.current.running ? '✅' : '❌'}</div>
-              </div>
-            </div>
-          </div>
+    <div ref={containerRef} style={{ width: '100%', height: '100%', minHeight: 220, minWidth: 320, position: 'relative' }}>
+      {/* Show a message if data is very sparse */}
+      {(nodeCount <= 2 || (sources.length <= 1 || targets.length <= 1)) && (
+        <div style={{
+          position: 'absolute',
+          top: 40,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(255,255,200,0.95)',
+          color: '#170F5F',
+          padding: '12px 24px',
+          borderRadius: 8,
+          fontWeight: 600,
+          fontSize: 18,
+          zIndex: 10,
+          boxShadow: '0 2px 12px 0 rgba(0,0,0,0.08)'
+        }}>
+          Not enough data to show a meaningful flow diagram.
         </div>
       )}
-      
-      {/* Visualization Container - Takes remaining space */}
-      <div
-        style={{
-          position: 'relative',
-          width: width,
-          height: height * 0.75, // Use 75% of available height for the chart
-          overflow: 'visible',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          background: 'transparent',
-          borderRadius: 0,
-          boxShadow: 'none',
-          margin: '0 auto',
-        }}
-        className="my-2"
+      <svg
+        ref={svgRef}
+        width={chartWidth + margin.left + margin.right}
+        height={chartHeight + margin.top + margin.bottom}
+        viewBox={`0 0 ${chartWidth + margin.left + margin.right} ${chartHeight + margin.top + margin.bottom}`}
+        style={{ display: 'block', width: '100%', height: '100%', background: 'transparent' }}
       >
-        <svg ref={svgRef} width={width} height={height * 0.75} style={{ overflow: 'visible', display: 'block', margin: '0 auto' }} />
-        {tooltipEl}
-      </div>
+        {/* Main chart group, translated by margin */}
+        <g transform={`translate(${margin.left},${margin.top})`}>
+          {/* ... nodes and links ... */}
+        </g>
+        {/* Debug outlines for alignment (only if debugOn) */}
+        {debugOn && (
+          <g transform={`translate(${margin.left},${margin.top})`}>
+            {/* Node debug outlines */}
+            {Array.isArray(debugSankeyData?.nodes) && debugSankeyData.nodes.map((d: any, i: number) => (
+              <rect
+                key={`debug-node-${i}`}
+                x={d.x0}
+                y={d.y0}
+                width={d.x1 - d.x0}
+                height={d.y1 - d.y0}
+                fill="none"
+                stroke="magenta"
+                strokeDasharray="4 2"
+                pointerEvents="none"
+              />
+            ))}
+            {/* Link debug outlines (if any) */}
+            {Array.isArray(debugSankeyData?.links) && debugSankeyData.links.map((d: any, i: number) => {
+              const path = sankeyLinkHorizontal()(d) || '';
+              return (
+                <path
+                  key={`debug-link-${i}`}
+                  d={path}
+                  fill="none"
+                  stroke="cyan"
+                  strokeWidth={2}
+                  pointerEvents="none"
+                />
+              );
+            })}
+          </g>
+        )}
+      </svg>
+      {tooltipEl}
     </div>
   );
 } 
