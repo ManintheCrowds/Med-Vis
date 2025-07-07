@@ -570,7 +570,7 @@ export default function ChordDiagram({
 
       const currentSideLength = animationRef.current.currentSide === 'left' ? leftValues.length : rightValues.length;
 
-      // Move to next position
+      // Move to next position - include the last index before switching
       if (animationRef.current.currentIndex < currentSideLength - 1) {
         animationRef.current.timer = setTimeout(() => {
           if (animationRef.current.running && !animationRef.current.isPaused) {
@@ -579,29 +579,30 @@ export default function ChordDiagram({
           }
         }, stepDuration + pauseDuration);
       } else {
-        // Switch sides or complete cycle
-        if (animationRef.current.currentSide === 'left') {
-          animationRef.current.currentSide = 'right';
-          animationRef.current.currentIndex = 0;
-          animationRef.current.timer = setTimeout(() => {
-            if (animationRef.current.running && !animationRef.current.isPaused) {
-              animate();
-            }
-          }, stepDuration);
-        } else {
-          // Complete cycle - show full diagram briefly, then restart
-          setAnimationPhase('full');
-          setHighlightedArcIndex(null);
-          setHighlightedSide(null);
-          
-          animationRef.current.timer = setTimeout(() => {
-            if (animationRef.current.running && !animationRef.current.isPaused) {
-              animationRef.current.currentSide = 'left';
+        // Show the last index for the full duration before switching
+        animationRef.current.timer = setTimeout(() => {
+          if (animationRef.current.running && !animationRef.current.isPaused) {
+            // Now switch sides or complete cycle
+            if (animationRef.current.currentSide === 'left') {
+              animationRef.current.currentSide = 'right';
               animationRef.current.currentIndex = 0;
               animate();
+            } else {
+              // Complete cycle - show full diagram briefly, then restart
+              setAnimationPhase('full');
+              setHighlightedArcIndex(null);
+              setHighlightedSide(null);
+              
+              animationRef.current.timer = setTimeout(() => {
+                if (animationRef.current.running && !animationRef.current.isPaused) {
+                  animationRef.current.currentSide = 'left';
+                  animationRef.current.currentIndex = 0;
+                  animate();
+                }
+              }, stepDuration * 2);
             }
-          }, stepDuration * 2);
-        }
+          }
+        }, stepDuration + pauseDuration);
       }
     };
 
@@ -680,7 +681,7 @@ export default function ChordDiagram({
 
       const currentSideLength = secondaryAnimationRef.current.currentSide === 'left' ? yearsCategories.length : peakPerfCategories.length;
 
-      // Move to next position
+      // Move to next position - include the last index before switching
       if (secondaryAnimationRef.current.currentIndex < currentSideLength - 1) {
         secondaryAnimationRef.current.timer = setTimeout(() => {
           if (secondaryAnimationRef.current.running && !secondaryAnimationRef.current.isPaused) {
@@ -689,29 +690,30 @@ export default function ChordDiagram({
           }
         }, stepDuration + pauseDuration);
       } else {
-        // Switch sides or complete cycle
-        if (secondaryAnimationRef.current.currentSide === 'left') {
-          secondaryAnimationRef.current.currentSide = 'right';
-          secondaryAnimationRef.current.currentIndex = 0;
-          secondaryAnimationRef.current.timer = setTimeout(() => {
-            if (secondaryAnimationRef.current.running && !secondaryAnimationRef.current.isPaused) {
-              animateSecondary();
-            }
-          }, stepDuration);
-        } else {
-          // Complete cycle - show full diagram briefly, then restart
-          setSecondaryAnimationPhase('full');
-          setSecondaryHighlightedArcIndex(null);
-          setSecondaryHighlightedSide(null);
-          
-          secondaryAnimationRef.current.timer = setTimeout(() => {
-            if (secondaryAnimationRef.current.running && !secondaryAnimationRef.current.isPaused) {
-              secondaryAnimationRef.current.currentSide = 'left';
+        // Show the last index for the full duration before switching
+        secondaryAnimationRef.current.timer = setTimeout(() => {
+          if (secondaryAnimationRef.current.running && !secondaryAnimationRef.current.isPaused) {
+            // Now switch sides or complete cycle
+            if (secondaryAnimationRef.current.currentSide === 'left') {
+              secondaryAnimationRef.current.currentSide = 'right';
               secondaryAnimationRef.current.currentIndex = 0;
               animateSecondary();
+            } else {
+              // Complete cycle - show full diagram briefly, then restart
+              setSecondaryAnimationPhase('full');
+              setSecondaryHighlightedArcIndex(null);
+              setSecondaryHighlightedSide(null);
+              
+              secondaryAnimationRef.current.timer = setTimeout(() => {
+                if (secondaryAnimationRef.current.running && !secondaryAnimationRef.current.isPaused) {
+                  secondaryAnimationRef.current.currentSide = 'left';
+                  secondaryAnimationRef.current.currentIndex = 0;
+                  animateSecondary();
+                }
+              }, stepDuration * 2);
             }
-          }, stepDuration * 2);
-        }
+          }
+        }, stepDuration + pauseDuration);
       }
     };
 
@@ -1158,15 +1160,10 @@ export default function ChordDiagram({
     // Check if this is a category change that should trigger animation
     const isCategoryChange = lastCategoryChange.source !== currentSource || lastCategoryChange.target !== currentTarget;
     
-    // Add smooth transitions for category changes
+    // Add smooth transitions - faster for hover interactions
     const transition = d3.transition()
-      .duration(isCategoryChange ? 750 : 200)
+      .duration(isCategoryChange ? 750 : 100)
       .ease(d3.easeCubicInOut);
-    
-    // Faster transition for hover interactions
-    const hoverTransition = d3.transition()
-      .duration(75)
-      .ease(d3.easeQuadOut);
 
     // --- True left/right bipartite layout with better spacing ---
     // Left arcs: 180°+gap to 360°-gap (Math.PI+gap to 2*Math.PI-gap)
@@ -1310,24 +1307,6 @@ export default function ChordDiagram({
         setHighlightedArcIndex(arcIndex);
         setHighlightedSide('left');
         
-        // Apply immediate hover transitions
-        g.selectAll('path.left-arc, path.right-arc, path.ribbon')
-          .transition(hoverTransition)
-          .attr('opacity', function(this, hoverD: any) {
-            const element = d3.select(this);
-            if (element.classed('left-arc')) {
-              const i = leftArcs.findIndex(arc => arc.name === hoverD.name);
-              return i === arcIndex ? 1.0 : 0.4;
-            } else if (element.classed('right-arc')) {
-              const i = rightArcs.findIndex(arc => arc.name === hoverD.name);
-              const matrixValue = connectionMatrix[arcIndex] && connectionMatrix[arcIndex][i];
-              return matrixValue > 0 ? 0.95 : 0.3;
-            } else if (element.classed('ribbon')) {
-              return hoverD.source.index === arcIndex ? 0.95 : 0.2;
-            }
-            return 0.3;
-          });
-        
         setTooltip({
           x: event.pageX,
           y: event.pageY,
@@ -1347,19 +1326,6 @@ export default function ChordDiagram({
         setAnimationPhase('full');
         setHighlightedArcIndex(null);
         setHighlightedSide(null);
-        
-        // Apply immediate reset transitions
-        g.selectAll('path.left-arc, path.right-arc, path.ribbon')
-          .transition(hoverTransition)
-          .attr('opacity', function(this, resetD: any) {
-            const element = d3.select(this);
-            if (element.classed('left-arc') || element.classed('right-arc')) {
-              return Math.max(0.8, resetD.opacity);
-            } else if (element.classed('ribbon')) {
-              return settings.isDarkMode ? 0.7 : 0.6;
-            }
-            return 0.8;
-          });
       });
     
     // Apply transition animations separately
@@ -1445,24 +1411,6 @@ export default function ChordDiagram({
         setHighlightedArcIndex(arcIndex);
         setHighlightedSide('right');
         
-        // Apply immediate hover transitions
-        g.selectAll('path.left-arc, path.right-arc, path.ribbon')
-          .transition(hoverTransition)
-          .attr('opacity', function(this, hoverD: any) {
-            const element = d3.select(this);
-            if (element.classed('right-arc')) {
-              const i = rightArcs.findIndex(arc => arc.name === hoverD.name);
-              return i === arcIndex ? 1.0 : 0.4;
-            } else if (element.classed('left-arc')) {
-              const i = leftArcs.findIndex(arc => arc.name === hoverD.name);
-              const matrixValue = connectionMatrix[i] && connectionMatrix[i][arcIndex];
-              return matrixValue > 0 ? 0.95 : 0.3;
-            } else if (element.classed('ribbon')) {
-              return hoverD.target.index === arcIndex ? 0.95 : 0.2;
-            }
-            return 0.3;
-          });
-        
         setTooltip({
           x: event.pageX,
           y: event.pageY,
@@ -1482,19 +1430,6 @@ export default function ChordDiagram({
         setAnimationPhase('full');
         setHighlightedArcIndex(null);
         setHighlightedSide(null);
-        
-        // Apply immediate reset transitions
-        g.selectAll('path.left-arc, path.right-arc, path.ribbon')
-          .transition(hoverTransition)
-          .attr('opacity', function(this, resetD: any) {
-            const element = d3.select(this);
-            if (element.classed('left-arc') || element.classed('right-arc')) {
-              return Math.max(0.8, resetD.opacity);
-            } else if (element.classed('ribbon')) {
-              return settings.isDarkMode ? 0.7 : 0.6;
-            }
-            return 0.8;
-          });
       });
     
     // Apply transition animations separately
@@ -1635,24 +1570,6 @@ export default function ChordDiagram({
         setHighlightedArcIndex(d.source.index);
         setHighlightedSide('left');
         
-        // Apply immediate hover transitions
-        g.selectAll('path.left-arc, path.right-arc, path.ribbon')
-          .transition(hoverTransition)
-          .attr('opacity', function(this, hoverD: any) {
-            const element = d3.select(this);
-            if (element.classed('left-arc')) {
-              const i = leftArcs.findIndex(arc => arc.name === hoverD.name);
-              return i === d.source.index ? 1.0 : 0.4;
-            } else if (element.classed('right-arc')) {
-              const i = rightArcs.findIndex(arc => arc.name === hoverD.name);
-              const matrixValue = connectionMatrix[d.source.index] && connectionMatrix[d.source.index][i];
-              return matrixValue > 0 ? 0.95 : 0.3;
-            } else if (element.classed('ribbon')) {
-              return hoverD.source.index === d.source.index && hoverD.target.index === d.target.index ? 1.0 : 0.2;
-            }
-            return 0.3;
-          });
-        
         setTooltip({
           x: event.pageX,
           y: event.pageY,
@@ -1674,19 +1591,6 @@ export default function ChordDiagram({
         setAnimationPhase('full');
         setHighlightedArcIndex(null);
         setHighlightedSide(null);
-        
-        // Apply immediate reset transitions
-        g.selectAll('path.left-arc, path.right-arc, path.ribbon')
-          .transition(hoverTransition)
-          .attr('opacity', function(this, resetD: any) {
-            const element = d3.select(this);
-            if (element.classed('left-arc') || element.classed('right-arc')) {
-              return Math.max(0.8, resetD.opacity);
-            } else if (element.classed('ribbon')) {
-              return settings.isDarkMode ? 0.7 : 0.6;
-            }
-            return 0.8;
-          });
       });
     
     // Apply transition animations separately

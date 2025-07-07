@@ -71,17 +71,26 @@ const availableFields = [
 
 const YEARS_CATEGORIES = ['0-5', '6-10', '11-15', '16-20', '20+'];
 
-// Custom wave path generator for Sankey links
-function sankeyLinkWave(d: any, waveAmplitude = 8, waveFrequency = 1.1) {
+// Custom wave path generator for Sankey links with bounds checking
+function sankeyLinkWave(d: any, waveAmplitude = 8, waveFrequency = 1.1, chartWidth = 800, chartHeight = 600) {
   // d has source/target: {x0, x1, y0, y1}
-  const x0 = d.source.x1;
-  const x1 = d.target.x0;
-  const y0 = d.y0;
-  const y1 = d.y1;
+  let x0 = d.source.x1;
+  let x1 = d.target.x0;
+  let y0 = d.y0;
+  let y1 = d.y1;
+  
+  // Clamp coordinates to chart bounds to prevent overflow
+  x0 = Math.max(0, Math.min(chartWidth, x0));
+  x1 = Math.max(0, Math.min(chartWidth, x1));
+  y0 = Math.max(0, Math.min(chartHeight, y0));
+  y1 = Math.max(0, Math.min(chartHeight, y1));
+  
   const midX = (x0 + x1) / 2;
-  // Add a sine wave to the control points
-  const waveY0 = y0 + waveAmplitude * Math.sin(waveFrequency * Math.PI * 0.25);
-  const waveY1 = y1 + waveAmplitude * Math.sin(waveFrequency * Math.PI * 0.75);
+  
+  // Add a sine wave to the control points, but ensure they stay within bounds
+  const waveY0 = Math.max(0, Math.min(chartHeight, y0 + waveAmplitude * Math.sin(waveFrequency * Math.PI * 0.25)));
+  const waveY1 = Math.max(0, Math.min(chartHeight, y1 + waveAmplitude * Math.sin(waveFrequency * Math.PI * 0.75)));
+  
   return `M${x0},${y0}
     C${midX},${waveY0} ${midX},${waveY1} ${x1},${y1}`;
 }
@@ -503,20 +512,20 @@ export default function AlluvialDiagram({
     }
 
     // Start new animation cycle
-    console.log('✅ Starting animation cycle:', {
-      sourceCategory: currentSource,
-      totalSources: sortedSources.length,
-      totalTargets: availableFields.filter(f => f.value !== currentSource).length,
-      speed: settings.autoPlaySpeed + 'ms'
-    });
+      console.log('✅ Starting animation cycle:', {
+        sourceCategory: currentSource,
+        totalSources: sortedSources.length,
+        totalTargets: availableFields.filter(f => f.value !== currentSource).length,
+        speed: settings.autoPlaySpeed + 'ms'
+      });
 
-    // Initialize animation state
-    animationRef.current.running = true;
-    animationRef.current.currentSourceIndex = 0;
-    animationRef.current.currentTargetIndex = 0;
+      // Initialize animation state
+      animationRef.current.running = true;
+      animationRef.current.currentSourceIndex = 0;
+      animationRef.current.currentTargetIndex = 0;
 
-    // Start animation
-    animate();
+      // Start animation
+      animate();
 
     return () => {
       if (animationRef.current.timer) {
@@ -645,7 +654,7 @@ export default function AlluvialDiagram({
     });
     const links = Array.from(linksMap.values());
 
-    // 4. Sankey layout with nodeId accessor
+    // 4. Sankey layout with nodeId accessor and improved bounds handling
     const sankeyGenerator = sankey<any, any>()
       .nodeId((d: any) => d.id)
       .nodeWidth(24)
@@ -659,15 +668,15 @@ export default function AlluvialDiagram({
     // Remove old gradients (no longer needed)
     defs.selectAll('linearGradient.link-gradient').remove();
 
-    // --- Add clipPath for links group ---
+    // --- Add clipPath for links group with tighter bounds ---
     svg.select('defs').selectAll('#link-clip').remove();
     defs.append('clipPath')
       .attr('id', 'link-clip')
       .append('rect')
-      .attr('x', 0)
-      .attr('y', 0)
-      .attr('width', width)
-      .attr('height', height);
+      .attr('x', margin.left)
+      .attr('y', margin.top)
+      .attr('width', chartWidth)
+      .attr('height', chartHeight);
     linksG.attr('clip-path', 'url(#link-clip)');
 
     // Add glow filter for dark mode
@@ -711,7 +720,7 @@ export default function AlluvialDiagram({
       .data(filteredLinks, linkKey)
       .enter()
       .append('path')
-      .attr('d', (d: any) => sankeyLinkWave(d, 8, 1.1))
+      .attr('d', (d: any) => sankeyLinkWave(d, 8, 1.1, chartWidth, chartHeight))
               .attr('stroke', (d: any) => getNodeColor(d.source, getCurrentThemeColors(), settings.isDarkMode))
       .attr('stroke-width', (d: any) => Math.max(settings.isDarkMode ? 2 : 1, d.width))
       .attr('fill', 'none')
@@ -835,10 +844,10 @@ export default function AlluvialDiagram({
     nodeSel.exit().remove();
     nodeSel.join(
       enter => enter.append('rect')
-        .attr('x', (d: any) => d.x0)
-        .attr('y', (d: any) => d.y0)
-        .attr('height', (d: any) => (d.value === 0 ? 0.0001 : d.y1 - d.y0))
-        .attr('width', (d: any) => d.x1 - d.x0)
+        .attr('x', (d: any) => Math.max(0, Math.min(chartWidth - (d.x1 - d.x0), d.x0)))
+        .attr('y', (d: any) => Math.max(0, Math.min(chartHeight - (d.y1 - d.y0), d.y0)))
+        .attr('height', (d: any) => (d.value === 0 ? 0.0001 : Math.min(chartHeight, d.y1 - d.y0)))
+        .attr('width', (d: any) => Math.min(chartWidth, d.x1 - d.x0))
         .attr('fill', (d: any) => getNodeColor(d, getCurrentThemeColors(), settings.isDarkMode))
         .attr('stroke', settings.isDarkMode ? '#444' : '#22223b')
         .attr('opacity', (d: any) => {
@@ -903,10 +912,10 @@ export default function AlluvialDiagram({
         }),
       update => update
         .transition(d3.transition().duration(750).ease(d3.easeCubicInOut))
-        .attr('x', (d: any) => d.x0)
-        .attr('y', (d: any) => d.y0)
-        .attr('height', (d: any) => (d.value === 0 ? 0.0001 : d.y1 - d.y0))
-        .attr('width', (d: any) => d.x1 - d.x0)
+        .attr('x', (d: any) => Math.max(0, Math.min(chartWidth - (d.x1 - d.x0), d.x0)))
+        .attr('y', (d: any) => Math.max(0, Math.min(chartHeight - (d.y1 - d.y0), d.y0)))
+        .attr('height', (d: any) => (d.value === 0 ? 0.0001 : Math.min(chartHeight, d.y1 - d.y0)))
+        .attr('width', (d: any) => Math.min(chartWidth, d.x1 - d.x0))
         .attr('fill', (d: any) => getNodeColor(d, getCurrentThemeColors(), settings.isDarkMode))
         .attr('opacity', (d: any) => {
           // Source nodes: only the highlighted one is bright
