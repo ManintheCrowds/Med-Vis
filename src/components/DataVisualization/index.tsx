@@ -96,8 +96,8 @@ export function DataVisualization() {
           />
         )}
 
-        {/* Debug info */}
-        {process.env.NODE_ENV === 'development' && (
+        {/* Debug info - Disabled for production */}
+        {false && (
           <div className="absolute top-20 left-4 bg-black/80 text-white p-2 rounded text-xs z-50">
             <div>AutoPlay: {settings.isAutoPlayEnabled ? 'ON' : 'OFF'}</div>
             <div>Speed: {settings.autoPlaySpeed}ms</div>

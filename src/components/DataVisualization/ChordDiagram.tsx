@@ -1162,6 +1162,11 @@ export default function ChordDiagram({
     const transition = d3.transition()
       .duration(isCategoryChange ? 750 : 200)
       .ease(d3.easeCubicInOut);
+    
+    // Faster transition for hover interactions
+    const hoverTransition = d3.transition()
+      .duration(75)
+      .ease(d3.easeQuadOut);
 
     // --- True left/right bipartite layout with better spacing ---
     // Left arcs: 180°+gap to 360°-gap (Math.PI+gap to 2*Math.PI-gap)
@@ -1305,6 +1310,24 @@ export default function ChordDiagram({
         setHighlightedArcIndex(arcIndex);
         setHighlightedSide('left');
         
+        // Apply immediate hover transitions
+        g.selectAll('path.left-arc, path.right-arc, path.ribbon')
+          .transition(hoverTransition)
+          .attr('opacity', function(this, hoverD: any) {
+            const element = d3.select(this);
+            if (element.classed('left-arc')) {
+              const i = leftArcs.findIndex(arc => arc.name === hoverD.name);
+              return i === arcIndex ? 1.0 : 0.4;
+            } else if (element.classed('right-arc')) {
+              const i = rightArcs.findIndex(arc => arc.name === hoverD.name);
+              const matrixValue = connectionMatrix[arcIndex] && connectionMatrix[arcIndex][i];
+              return matrixValue > 0 ? 0.95 : 0.3;
+            } else if (element.classed('ribbon')) {
+              return hoverD.source.index === arcIndex ? 0.95 : 0.2;
+            }
+            return 0.3;
+          });
+        
         setTooltip({
           x: event.pageX,
           y: event.pageY,
@@ -1324,6 +1347,19 @@ export default function ChordDiagram({
         setAnimationPhase('full');
         setHighlightedArcIndex(null);
         setHighlightedSide(null);
+        
+        // Apply immediate reset transitions
+        g.selectAll('path.left-arc, path.right-arc, path.ribbon')
+          .transition(hoverTransition)
+          .attr('opacity', function(this, resetD: any) {
+            const element = d3.select(this);
+            if (element.classed('left-arc') || element.classed('right-arc')) {
+              return Math.max(0.8, resetD.opacity);
+            } else if (element.classed('ribbon')) {
+              return settings.isDarkMode ? 0.7 : 0.6;
+            }
+            return 0.8;
+          });
       });
     
     // Apply transition animations separately
@@ -1409,6 +1445,24 @@ export default function ChordDiagram({
         setHighlightedArcIndex(arcIndex);
         setHighlightedSide('right');
         
+        // Apply immediate hover transitions
+        g.selectAll('path.left-arc, path.right-arc, path.ribbon')
+          .transition(hoverTransition)
+          .attr('opacity', function(this, hoverD: any) {
+            const element = d3.select(this);
+            if (element.classed('right-arc')) {
+              const i = rightArcs.findIndex(arc => arc.name === hoverD.name);
+              return i === arcIndex ? 1.0 : 0.4;
+            } else if (element.classed('left-arc')) {
+              const i = leftArcs.findIndex(arc => arc.name === hoverD.name);
+              const matrixValue = connectionMatrix[i] && connectionMatrix[i][arcIndex];
+              return matrixValue > 0 ? 0.95 : 0.3;
+            } else if (element.classed('ribbon')) {
+              return hoverD.target.index === arcIndex ? 0.95 : 0.2;
+            }
+            return 0.3;
+          });
+        
         setTooltip({
           x: event.pageX,
           y: event.pageY,
@@ -1428,6 +1482,19 @@ export default function ChordDiagram({
         setAnimationPhase('full');
         setHighlightedArcIndex(null);
         setHighlightedSide(null);
+        
+        // Apply immediate reset transitions
+        g.selectAll('path.left-arc, path.right-arc, path.ribbon')
+          .transition(hoverTransition)
+          .attr('opacity', function(this, resetD: any) {
+            const element = d3.select(this);
+            if (element.classed('left-arc') || element.classed('right-arc')) {
+              return Math.max(0.8, resetD.opacity);
+            } else if (element.classed('ribbon')) {
+              return settings.isDarkMode ? 0.7 : 0.6;
+            }
+            return 0.8;
+          });
       });
     
     // Apply transition animations separately
@@ -1568,6 +1635,24 @@ export default function ChordDiagram({
         setHighlightedArcIndex(d.source.index);
         setHighlightedSide('left');
         
+        // Apply immediate hover transitions
+        g.selectAll('path.left-arc, path.right-arc, path.ribbon')
+          .transition(hoverTransition)
+          .attr('opacity', function(this, hoverD: any) {
+            const element = d3.select(this);
+            if (element.classed('left-arc')) {
+              const i = leftArcs.findIndex(arc => arc.name === hoverD.name);
+              return i === d.source.index ? 1.0 : 0.4;
+            } else if (element.classed('right-arc')) {
+              const i = rightArcs.findIndex(arc => arc.name === hoverD.name);
+              const matrixValue = connectionMatrix[d.source.index] && connectionMatrix[d.source.index][i];
+              return matrixValue > 0 ? 0.95 : 0.3;
+            } else if (element.classed('ribbon')) {
+              return hoverD.source.index === d.source.index && hoverD.target.index === d.target.index ? 1.0 : 0.2;
+            }
+            return 0.3;
+          });
+        
         setTooltip({
           x: event.pageX,
           y: event.pageY,
@@ -1589,6 +1674,19 @@ export default function ChordDiagram({
         setAnimationPhase('full');
         setHighlightedArcIndex(null);
         setHighlightedSide(null);
+        
+        // Apply immediate reset transitions
+        g.selectAll('path.left-arc, path.right-arc, path.ribbon')
+          .transition(hoverTransition)
+          .attr('opacity', function(this, resetD: any) {
+            const element = d3.select(this);
+            if (element.classed('left-arc') || element.classed('right-arc')) {
+              return Math.max(0.8, resetD.opacity);
+            } else if (element.classed('ribbon')) {
+              return settings.isDarkMode ? 0.7 : 0.6;
+            }
+            return 0.8;
+          });
       });
     
     // Apply transition animations separately
