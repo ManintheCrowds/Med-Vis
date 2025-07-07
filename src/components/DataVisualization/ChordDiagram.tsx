@@ -566,18 +566,18 @@ export default function ChordDiagram({
         animationRef.current.timer = setTimeout(() => {
           if (animationRef.current.running && !animationRef.current.isPaused) {
             // Now switch sides or complete cycle
-            if (animationRef.current.currentSide === 'left') {
-              animationRef.current.currentSide = 'right';
-              animationRef.current.currentIndex = 0;
+        if (animationRef.current.currentSide === 'left') {
+          animationRef.current.currentSide = 'right';
+          animationRef.current.currentIndex = 0;
               animate();
-            } else {
-              // Complete cycle - show full diagram briefly, then restart
+        } else {
+          // Complete cycle - show full diagram briefly, then restart
               animationRef.current.cycleCount++;
               const nextModeIndex = (currentModeIndex + 1) % cyclingModes.length;
               console.log('🎉 ChordAnimation completed full cycle #' + animationRef.current.cycleCount + '! Advancing to mode', nextModeIndex, cyclingModes[nextModeIndex]);
-              setAnimationPhase('full');
-              setHighlightedArcIndex(null);
-              setHighlightedSide(null);
+          setAnimationPhase('full');
+          setHighlightedArcIndex(null);
+          setHighlightedSide(null);
               setTimeout(() => {
                 setCurrentModeIndex(nextModeIndex);
                 setCurrentSource(cyclingModes[nextModeIndex].source);
@@ -585,8 +585,8 @@ export default function ChordDiagram({
                 setLastCategoryChange({ source: cyclingModes[nextModeIndex].source, target: cyclingModes[nextModeIndex].target });
                 onRelationshipChange?.(cyclingModes[nextModeIndex].source, cyclingModes[nextModeIndex].target);
                 // Animation will restart due to dependency on currentSource/currentTarget
-              }, stepDuration * 2);
-            }
+          }, stepDuration * 2);
+        }
           }
         }, stepDuration + pauseDuration);
       }
@@ -819,25 +819,25 @@ export default function ChordDiagram({
         secondaryAnimationRef.current.timer = setTimeout(() => {
           if (secondaryAnimationRef.current.running && !secondaryAnimationRef.current.isPaused) {
             // Now switch sides or complete cycle
-            if (secondaryAnimationRef.current.currentSide === 'left') {
-              secondaryAnimationRef.current.currentSide = 'right';
+        if (secondaryAnimationRef.current.currentSide === 'left') {
+          secondaryAnimationRef.current.currentSide = 'right';
+          secondaryAnimationRef.current.currentIndex = 0;
+              animateSecondary();
+        } else {
+          // Complete cycle - show full diagram briefly, then restart
+              console.log('🎉 SecondaryChordAnimation completed full cycle! Restarting...');
+          setSecondaryAnimationPhase('full');
+          setSecondaryHighlightedArcIndex(null);
+          setSecondaryHighlightedSide(null);
+          
+          secondaryAnimationRef.current.timer = setTimeout(() => {
+            if (secondaryAnimationRef.current.running && !secondaryAnimationRef.current.isPaused) {
+              secondaryAnimationRef.current.currentSide = 'left';
               secondaryAnimationRef.current.currentIndex = 0;
               animateSecondary();
-            } else {
-              // Complete cycle - show full diagram briefly, then restart
-              console.log('🎉 SecondaryChordAnimation completed full cycle! Restarting...');
-              setSecondaryAnimationPhase('full');
-              setSecondaryHighlightedArcIndex(null);
-              setSecondaryHighlightedSide(null);
-              
-              secondaryAnimationRef.current.timer = setTimeout(() => {
-                if (secondaryAnimationRef.current.running && !secondaryAnimationRef.current.isPaused) {
-                  secondaryAnimationRef.current.currentSide = 'left';
-                  secondaryAnimationRef.current.currentIndex = 0;
-                  animateSecondary();
-                }
-              }, stepDuration * 2);
             }
+          }, stepDuration * 2);
+        }
           }
         }, stepDuration + pauseDuration);
       }
@@ -1052,29 +1052,29 @@ export default function ChordDiagram({
   // Add pause/resume functionality
   const pauseAnimation = (reason: string) => {
     console.log('⏸️ Pausing animation:', reason);
-    animationRef.current.isPaused = true;
+      animationRef.current.isPaused = true;
     secondaryAnimationRef.current.isPaused = true;
-    if (animationRef.current.timer) {
-      clearTimeout(animationRef.current.timer);
-      animationRef.current.timer = null;
-    }
-    if (secondaryAnimationRef.current.timer) {
-      clearTimeout(secondaryAnimationRef.current.timer);
-      secondaryAnimationRef.current.timer = null;
-    }
+      if (animationRef.current.timer) {
+        clearTimeout(animationRef.current.timer);
+        animationRef.current.timer = null;
+      }
+      if (secondaryAnimationRef.current.timer) {
+        clearTimeout(secondaryAnimationRef.current.timer);
+        secondaryAnimationRef.current.timer = null;
+      }
   };
 
   const resumeAnimation = (reason: string) => {
     console.log('▶️ Resuming animation:', reason);
-    animationRef.current.isPaused = false;
+      animationRef.current.isPaused = false;
     secondaryAnimationRef.current.isPaused = false;
-    
+        
     // Ensure animation state is properly reset
     if (!animationRef.current.running) {
       console.log('🔄 Restarting chord animation after resume');
       animationRef.current.running = true;
-      animationRef.current.currentIndex = 0;
-      animationRef.current.currentSide = 'left';
+                animationRef.current.currentIndex = 0;
+                animationRef.current.currentSide = 'left';
       animationRef.current.cycleCount = 0;
     }
     

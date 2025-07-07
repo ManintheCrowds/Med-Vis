@@ -106,6 +106,23 @@ function sankeyLinkWave(d: any, waveAmplitude = 8, waveFrequency = 1.1, chartWid
     C${midX},${waveY0} ${midX},${waveY1} ${x1},${y1}`;
 }
 
+// Custom horizontal link generator that clamps y0/y1 to node bounds
+function clampedSankeyLinkHorizontal() {
+  return function(d: any) {
+    // Clamp y0/y1 to node bounds
+    const sy = Math.max(d.source.y0, Math.min(d.source.y1, d.y0));
+    const ty = Math.max(d.target.y0, Math.min(d.target.y1, d.y1));
+    const x0 = d.source.x1;
+    const x1 = d.target.x0;
+    // Use a cubic Bezier for smoothness
+    const curvature = 0.5;
+    const xi = d3.interpolateNumber(x0, x1);
+    const x2 = xi(curvature);
+    const x3 = xi(1 - curvature);
+    return `M${x0},${sy}C${x2},${sy} ${x3},${ty} ${x1},${ty}`;
+  };
+}
+
 // Note: Using theme-aware getNodeColor function from colorUtils
 
 export default function AlluvialDiagram({
@@ -757,19 +774,88 @@ export default function AlluvialDiagram({
       if (link.isDummy) link.value = 0.0001;
     });
 
+    // --- COLUMN HEIGHT NORMALIZATION ---
+    // Calculate total value for each side
+    const leftTotals = sortedSources.map(source => {
+      const sourceId = `${currentSource}:${source}`;
+      return Array.from(linksMap.values()).filter(l => l.source === sourceId).reduce((sum, l) => sum + l.value, 0);
+    });
+    const rightTotals = sortedTargets.map(target => {
+      const targetId = `${currentTarget}:${target}`;
+      return Array.from(linksMap.values()).filter(l => l.target === targetId).reduce((sum, l) => sum + l.value, 0);
+    });
+    const leftSum = leftTotals.reduce((a, b) => a + b, 0);
+    const rightSum = rightTotals.reduce((a, b) => a + b, 0);
+    // If sums are different, scale the smaller side's node values and link values
+    let leftScale = 1, rightScale = 1;
+    if (leftSum > 0 && rightSum > 0 && leftSum !== rightSum) {
+      if (leftSum > rightSum) {
+        rightScale = leftSum / rightSum;
+      } else {
+        leftScale = rightSum / leftSum;
+      }
+    }
+    // Scale links
+    Array.from(linksMap.values()).forEach(link => {
+      const sourceId = link.source;
+      const targetId = link.target;
+      if (leftScale !== 1 && sortedSources.some(s => `${currentSource}:${s}` === sourceId)) {
+        link.value *= leftScale;
+      }
+      if (rightScale !== 1 && sortedTargets.some(t => `${currentTarget}:${t}` === targetId)) {
+        link.value *= rightScale;
+      }
+    });
+
     const links = Array.from(linksMap.values());
+
+    // --- DYNAMIC NODE PADDING ---
+    // Reduce nodePadding for sparse data
+    let dynamicNodePadding = nodePadding;
+    if (sortedSources.length <= 4 && sortedTargets.length <= 4) {
+      dynamicNodePadding = Math.max(8, nodePadding / 2);
+    }
 
     // Sankey layout
     const sankeyGenerator = sankey<any, any>()
       .nodeId((d: any) => d.id)
       .nodeWidth(12)
-      .nodePadding(nodePadding)
+      .nodePadding(dynamicNodePadding)
       .extent([[0, 0], [chartWidth, chartHeight]]);
 
     const sankeyData = sankeyGenerator({
       nodes: nodes.map((d) => ({ ...d })),
       links: links.map((d) => ({ ...d })),
     });
+
+    // --- FORCE ROW ALIGNMENT IF NODE SETS MATCH ---
+    // If left and right node sets have the same length and order, align their y0/y1
+    const leftNodes = sankeyData.nodes.filter((n: any) => n.category === currentSource);
+    const rightNodes = sankeyData.nodes.filter((n: any) => n.category === currentTarget);
+    if (
+      leftNodes.length === rightNodes.length &&
+      leftNodes.every((n, i) => rightNodes[i] && n.name === rightNodes[i].name)
+    ) {
+      // Force y0/y1 of right nodes to match left nodes
+      rightNodes.forEach((n, i) => {
+        n.y0 = leftNodes[i].y0;
+        n.y1 = leftNodes[i].y1;
+      });
+    }
+
+    // --- VISUAL GUIDES: Render horizontal bands for each row ---
+    svg.selectAll('rect.row-guide')
+      .data(leftNodes)
+      .enter()
+      .append('rect')
+      .attr('class', 'row-guide')
+      .attr('x', -margin.left)
+      .attr('y', (d: any) => d.y0)
+      .attr('width', chartWidth + margin.left + margin.right)
+      .attr('height', (d: any) => d.y1 - d.y0)
+      .attr('fill', (d, i) => i % 2 === 0 ? '#f5f7fa' : '#e9eef5')
+      .attr('opacity', 0.25)
+      .lower();
 
     // Compute vertical offset to center the diagram
     const nodeYs = sankeyData.nodes.map((d: any) => [d.y0, d.y1]).flat();
@@ -842,7 +928,7 @@ export default function AlluvialDiagram({
       .data(filteredLinks, linkKey)
       .enter()
       .append('path')
-      .attr('d', (d: any) => sankeyLinkHorizontal()(d))
+      .attr('d', clampedSankeyLinkHorizontal())
       .attr('stroke', (d: any) => getNodeColor(d.source, getCurrentThemeColors(), settings.isDarkMode))
       .attr('stroke-width', (d: any) => Math.max(settings.isDarkMode ? 2 : 1, d.width))
       .attr('fill', 'none')
@@ -1242,7 +1328,27 @@ export default function AlluvialDiagram({
 
   }, [hoveredNode, hoveredLink]);
 
-  // Tooltip rendering with dark mode support
+  // Tooltip fadeout logic
+  const [tooltipVisible, setTooltipVisible] = useState(false);
+  const tooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (tooltip) {
+      setTooltipVisible(true);
+      if (tooltipTimeoutRef.current) clearTimeout(tooltipTimeoutRef.current);
+      tooltipTimeoutRef.current = setTimeout(() => {
+        setTooltipVisible(false);
+        setTimeout(() => setTooltip(null), 400); // Wait for fadeout
+      }, 5000);
+    } else {
+      setTooltipVisible(false);
+      if (tooltipTimeoutRef.current) clearTimeout(tooltipTimeoutRef.current);
+    }
+    return () => {
+      if (tooltipTimeoutRef.current) clearTimeout(tooltipTimeoutRef.current);
+    };
+  }, [tooltip]);
+
   const tooltipEl = tooltip ? (
     <div
       style={{
@@ -1266,6 +1372,8 @@ export default function AlluvialDiagram({
         whiteSpace: 'nowrap',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
+        opacity: tooltipVisible ? 1 : 0,
+        transition: 'opacity 0.4s',
       }}
       role="tooltip"
       aria-live="polite"
@@ -1512,7 +1620,7 @@ export default function AlluvialDiagram({
             ))}
             {/* Link debug outlines (if any) */}
             {Array.isArray(debugSankeyData?.links) && debugSankeyData.links.map((d: any, i: number) => {
-              const path = sankeyLinkHorizontal()(d) || '';
+              const path = clampedSankeyLinkHorizontal()(d) || '';
               return (
                 <path
                   key={`debug-link-${i}`}
