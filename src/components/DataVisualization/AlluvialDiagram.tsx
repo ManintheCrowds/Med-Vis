@@ -858,10 +858,10 @@ export default function AlluvialDiagram({
       .attr('height', (d: any) => d.y1 - d.y0)
       .attr('fill', (d, i) =>
         settings.isDarkMode
-          ? (i % 2 === 0 ? '#23242a' : '#18191d') // subtle dark bands
+          ? (i % 2 === 0 ? '#18191d' : '#141416') // colors closer to background
           : (i % 2 === 0 ? '#f5f7fa' : '#e9eef5')
       )
-      .attr('opacity', settings.isDarkMode ? 0.5 : 0.25)
+      .attr('opacity', settings.isDarkMode ? 0.15 : 0.25) // reduced opacity for dark mode
       .lower();
 
     // Compute vertical offset to center the diagram
@@ -1062,7 +1062,15 @@ export default function AlluvialDiagram({
         .attr('y', (d: any) => d.y0)
         .attr('height', (d: any) => d.y1 - d.y0)
         .attr('width', (d: any) => d.x1 - d.x0)
-        .attr('fill', (d: any) => getNodeColor(d, getCurrentThemeColors(), settings.isDarkMode))
+        .attr('fill', (d: any) => {
+          const color = getNodeColor(d, getCurrentThemeColors(), settings.isDarkMode);
+          // Fallback to a default color if getNodeColor returns invalid color
+          if (!color || color === '#000000' || color === 'black' || color === '#000') {
+            console.warn('Invalid color for node:', d.name, d.category, 'using fallback');
+            return settings.isDarkMode ? '#4a90e2' : '#2563eb';
+          }
+          return color;
+        })
         .attr('stroke', settings.isDarkMode ? '#444' : '#22223b')
         .attr('opacity', (d: any) => {
           // Source nodes: only the highlighted one is bright
@@ -1130,7 +1138,15 @@ export default function AlluvialDiagram({
         .attr('y', (d: any) => d.y0)
         .attr('height', (d: any) => d.y1 - d.y0)
         .attr('width', (d: any) => d.x1 - d.x0)
-        .attr('fill', (d: any) => getNodeColor(d, getCurrentThemeColors(), settings.isDarkMode))
+        .attr('fill', (d: any) => {
+          const color = getNodeColor(d, getCurrentThemeColors(), settings.isDarkMode);
+          // Fallback to a default color if getNodeColor returns invalid color
+          if (!color || color === '#000000' || color === 'black' || color === '#000') {
+            console.warn('Invalid color for node:', d.name, d.category, 'using fallback');
+            return settings.isDarkMode ? '#4a90e2' : '#2563eb';
+          }
+          return color;
+        })
         .attr('opacity', (d: any) => {
           // Source nodes: only the highlighted one is bright
           if (d.category === currentSource) {
@@ -1215,7 +1231,15 @@ export default function AlluvialDiagram({
       .attr('y', (d: any) => d.y0)
       .attr('height', (d: any) => d.y1 - d.y0)
       .attr('width', (d: any) => d.x1 - d.x0)
-      .attr('fill', (d: any) => getNodeColor(d, getCurrentThemeColors(), settings.isDarkMode));
+              .attr('fill', (d: any) => {
+          const color = getNodeColor(d, getCurrentThemeColors(), settings.isDarkMode);
+          // Fallback to a default color if getNodeColor returns invalid color
+          if (!color || color === '#000000' || color === 'black' || color === '#000') {
+            console.warn('Invalid color for node:', d.name, d.category, 'using fallback');
+            return settings.isDarkMode ? '#4a90e2' : '#2563eb';
+          }
+          return color;
+        });
 
   }, [filteredData, currentSource, currentTarget, containerWidth, containerHeight, settings.categoryColors, settings.isDarkMode, lastCategoryChange, getCurrentThemeColors]);
 
@@ -1578,11 +1602,67 @@ export default function AlluvialDiagram({
 
   return (
     <div ref={containerRef} style={{ width: '100%', height: '100%', minHeight: 220, minWidth: 320, position: 'relative' }}>
+      {/* Category Selection Controls */}
+      <div style={{
+        position: 'absolute',
+        top: 10,
+        left: 10,
+        right: 10,
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        zIndex: 20,
+        pointerEvents: 'none'
+      }}>
+        <div style={{ pointerEvents: 'auto' }}>
+          <select
+            value={currentSource}
+            onChange={(e) => setCurrentSource(e.target.value)}
+            style={{
+              padding: '8px 12px',
+              borderRadius: '6px',
+              border: settings.isDarkMode ? '1px solid #444' : '1px solid #ccc',
+              background: settings.isDarkMode ? '#2a2a2a' : '#fff',
+              color: settings.isDarkMode ? '#fff' : '#000',
+              fontSize: '14px',
+              fontFamily: 'Avenir Next World, sans-serif'
+            }}
+          >
+            {availableFields.map((field) => (
+              <option key={field.value} value={field.value}>
+                {field.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div style={{ pointerEvents: 'auto' }}>
+          <select
+            value={currentTarget}
+            onChange={(e) => setCurrentTarget(e.target.value)}
+            style={{
+              padding: '8px 12px',
+              borderRadius: '6px',
+              border: settings.isDarkMode ? '1px solid #444' : '1px solid #ccc',
+              background: settings.isDarkMode ? '#2a2a2a' : '#fff',
+              color: settings.isDarkMode ? '#fff' : '#000',
+              fontSize: '14px',
+              fontFamily: 'Avenir Next World, sans-serif'
+            }}
+          >
+            {availableFields.map((field) => (
+              <option key={field.value} value={field.value}>
+                {field.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      
       {/* Show a message if data is very sparse */}
       {(nodeCount <= 2 || (sources.length <= 1 || targets.length <= 1)) && (
         <div style={{
           position: 'absolute',
-          top: 40,
+          top: 80,
           left: '50%',
           transform: 'translateX(-50%)',
           background: 'rgba(255,255,200,0.95)',
