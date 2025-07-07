@@ -208,20 +208,23 @@ export default function AlluvialDiagram({
 
   // Calculate node count for sizing
   const nodeCount = Math.max(sources.length, targets.length, 1);
-  // Calculate available height for nodes and paddings
+
+  // --- Sparse Data Tuning ---
+  // For sparse data, shrink chart and cap node/link size
   let availableHeight = Math.max(MIN_CHART_HEIGHT, Math.min(containerHeight - 40, MAX_CHART_HEIGHT));
-  // For very sparse data, shrink the chart height
+  let maxNodeHeight = 48;
+  let maxLinkWidth = 32;
   if (nodeCount <= 3) {
-    availableHeight = Math.max(MIN_CHART_HEIGHT, Math.min(320, availableHeight));
+    availableHeight = Math.max(MIN_CHART_HEIGHT, Math.min(220, availableHeight)); // Shrink chart height
+    maxNodeHeight = 28; // Cap node height
+    maxLinkWidth = 16;  // Cap link thickness
   }
-  // For very dense data, allow more height
   if (nodeCount >= 10) {
     availableHeight = Math.min(MAX_CHART_HEIGHT, Math.max(availableHeight, 500));
   }
 
   // Node height and padding logic
   const minNodeHeight = 16;
-  const maxNodeHeight = nodeCount <= 3 ? 36 : 48; // Smaller max for sparse data
   const minPadding = 8;
   let nodeHeight = Math.floor((availableHeight - (nodeCount + 1) * minPadding) / nodeCount);
   nodeHeight = Math.max(minNodeHeight, Math.min(nodeHeight, maxNodeHeight));
@@ -259,7 +262,7 @@ export default function AlluvialDiagram({
 
   // If very sparse, shrink width too
   if (nodeCount <= 3) {
-    chartWidth = Math.max(MIN_CHART_WIDTH, Math.min(chartWidth, 480));
+    chartWidth = Math.max(MIN_CHART_WIDTH, Math.min(chartWidth, 420));
   }
 
   // If very dense, allow more width
@@ -853,8 +856,12 @@ export default function AlluvialDiagram({
       .attr('y', (d: any) => d.y0)
       .attr('width', chartWidth + margin.left + margin.right)
       .attr('height', (d: any) => d.y1 - d.y0)
-      .attr('fill', (d, i) => i % 2 === 0 ? '#f5f7fa' : '#e9eef5')
-      .attr('opacity', 0.25)
+      .attr('fill', (d, i) =>
+        settings.isDarkMode
+          ? (i % 2 === 0 ? '#23242a' : '#18191d') // subtle dark bands
+          : (i % 2 === 0 ? '#f5f7fa' : '#e9eef5')
+      )
+      .attr('opacity', settings.isDarkMode ? 0.5 : 0.25)
       .lower();
 
     // Compute vertical offset to center the diagram
@@ -930,7 +937,7 @@ export default function AlluvialDiagram({
       .append('path')
       .attr('d', clampedSankeyLinkHorizontal())
       .attr('stroke', (d: any) => getNodeColor(d.source, getCurrentThemeColors(), settings.isDarkMode))
-      .attr('stroke-width', (d: any) => Math.max(settings.isDarkMode ? 2 : 1, d.width))
+      .attr('stroke-width', (d: any) => Math.min(Math.max(settings.isDarkMode ? 2 : 1, d.width), maxLinkWidth))
       .attr('fill', 'none')
       .attr('filter', (d: any) => {
         if (hoveredLink === d) return 'url(#glow)';

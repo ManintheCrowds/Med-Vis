@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, Component, ErrorInfo, ReactNode } from 'react';
 import * as d3 from 'd3';
 import { arc } from 'd3-shape';
 import { useVisualizationData } from './shared/useVisualizationData';
@@ -55,7 +55,33 @@ function getNodeColor(nodeName: string, category: string, globalColors: any, isD
   return '#8884d8';
 }
 
-export default function ChordDiagram({
+// --- TypeScript Types for Chord Diagram ---
+// (If you already import ChordGroup/ChordLink from shared/chordUtils, do not redefine here)
+
+// --- Simple Error Boundary for Robustness ---
+
+class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError(_: Error) {
+    return { hasError: true };
+  }
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    // Log error to monitoring service if needed
+    console.error('ChordDiagram ErrorBoundary:', error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return <div style={{ color: 'red', padding: 24 }}>Something went wrong in the Chord Diagram.</div>;
+    }
+    return this.props.children;
+  }
+}
+
+// --- Main ChordDiagram wrapped in ErrorBoundary ---
+function ChordDiagramInternal({
   width = 1400,
   height = 1000,
   autoPlay = true,
@@ -1859,5 +1885,13 @@ export default function ChordDiagram({
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ChordDiagram(props: ChordDiagramProps) {
+  return (
+    <ErrorBoundary>
+      <ChordDiagramInternal {...props} />
+    </ErrorBoundary>
   );
 } 

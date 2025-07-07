@@ -19,6 +19,7 @@ export function AdminPanel() {
   const [responses, setResponses] = useState<SurveyResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [tagValues, setTagValues] = useState<Record<string, string>>({});
 
   // Fetch pending responses
   useEffect(() => {
@@ -91,8 +92,15 @@ export function AdminPanel() {
               type="text"
               placeholder="Tag (optional)"
               className="border p-1 rounded"
-              onBlur={(e) => moderate(r.id, "approved", e.target.value)}
+              value={tagValues[r.id] || ""}
+              onChange={(e) => setTagValues({ ...tagValues, [r.id]: e.target.value })}
             />
+            <button
+              className="bg-blue-600 text-white px-3 py-1 rounded"
+              onClick={() => moderate(r.id, "approved", tagValues[r.id])}
+            >
+              Save Tag
+            </button>
           </div>
         </div>
       ))}

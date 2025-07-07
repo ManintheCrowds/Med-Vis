@@ -1,3 +1,5 @@
 {
-  "/visualization/page": "app/visualization/page.js"
+  "/visualization/page": "app/visualization/page.js",
+  "/admin/controls/page": "app/admin/controls/page.js",
+  "/visualization/dark/page": "app/visualization/dark/page.js"
 }
