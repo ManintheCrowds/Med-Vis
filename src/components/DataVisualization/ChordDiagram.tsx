@@ -66,8 +66,8 @@ export default function ChordDiagram({
   const svgRef = useRef<SVGSVGElement>(null);
   const secondarySvgRef = useRef<SVGSVGElement>(null);
   const { data, isLoading, error } = useVisualizationData();
-  const [currentSource, setCurrentSource] = useState('years_at_medtronic');
-  const [currentTarget, setCurrentTarget] = useState('learning_style');
+  const [currentSource, setCurrentSource] = useState(cyclingModes[0].source);
+  const [currentTarget, setCurrentTarget] = useState(cyclingModes[0].target);
   const [insights, setInsights] = useState<Array<{ title: string; value: string; description?: string }>>([]);
   const [tooltip, setTooltip] = useState<{ x: number; y: number; content: React.ReactNode } | null>(null);
   const { settings } = useAppContext();
@@ -345,7 +345,7 @@ export default function ChordDiagram({
         }
         return settings.isDarkMode ? 0.7 : 0.6;
       })
-      .style('stroke-width', d => {
+      .style('stroke-width', (d: any) => {
         if (secondaryAnimationPhase === 'highlighting') {
           if (secondaryHighlightedArcIndex === d.source.index || secondaryHighlightedArcIndex === d.target.index) {
             return 2.5;
@@ -445,8 +445,8 @@ export default function ChordDiagram({
     }
   }, []);
 
-  // Track current mode index with ref to avoid dependency issues
-  const currentModeIndexRef = useRef(0);
+  // Track current mode index with state
+  const [currentModeIndex, setCurrentModeIndex] = useState(0);
   
   // Update mode index when source/target changes
   useEffect(() => {
@@ -454,53 +454,9 @@ export default function ChordDiagram({
       mode => mode.source === currentSource && mode.target === currentTarget
     );
     if (modeIndex !== -1) {
-      currentModeIndexRef.current = modeIndex;
+      setCurrentModeIndex(modeIndex);
     }
   }, [currentSource, currentTarget]);
-
-  // Auto-cycling logic with stable dependencies
-  useEffect(() => {
-    console.log('🎵 ChordDiagram auto-cycling useEffect:', {
-      autoPlay,
-      isAutoPlayEnabled: settings.isAutoPlayEnabled,
-      autoPlaySpeed: settings.autoPlaySpeed
-    });
-
-    if (!autoPlay || !settings.isAutoPlayEnabled) {
-      console.log('❌ ChordDiagram auto-cycling disabled');
-      return;
-    }
-
-    console.log('✅ ChordDiagram starting auto-cycling');
-
-    const interval = setInterval(() => {
-      const nextModeIndex = (currentModeIndexRef.current + 1) % cyclingModes.length;
-      const nextMode = cyclingModes[nextModeIndex];
-      
-      // Safety check: ensure source and target are different
-      if (nextMode.source === nextMode.target) {
-        console.warn('Skipping invalid cycling mode with same source and target:', nextMode);
-        return;
-      }
-      
-      console.log('🔄 ChordDiagram cycling to:', {
-        from: `mode ${currentModeIndexRef.current}`,
-        to: `${nextMode.source} → ${nextMode.target}`,
-        modeIndex: nextModeIndex
-      });
-      
-      currentModeIndexRef.current = nextModeIndex;
-      setCurrentSource(nextMode.source);
-      setCurrentTarget(nextMode.target);
-      setLastCategoryChange({ source: nextMode.source, target: nextMode.target });
-      onRelationshipChange?.(nextMode.source, nextMode.target);
-    }, settings.autoPlaySpeed || 6000);
-
-    return () => {
-      console.log('🧹 ChordDiagram cleaning up auto-cycling interval');
-      clearInterval(interval);
-    };
-  }, [autoPlay, settings.isAutoPlayEnabled, settings.autoPlaySpeed]); // Stable dependencies only
 
   // Remove pulsing animation to eliminate flickering - will use CSS animations instead if needed
 
@@ -609,17 +565,18 @@ export default function ChordDiagram({
             } else {
               // Complete cycle - show full diagram briefly, then restart
               animationRef.current.cycleCount++;
-              console.log('🎉 ChordAnimation completed full cycle #' + animationRef.current.cycleCount + '! Restarting...');
+              const nextModeIndex = (currentModeIndex + 1) % cyclingModes.length;
+              console.log('🎉 ChordAnimation completed full cycle #' + animationRef.current.cycleCount + '! Advancing to mode', nextModeIndex, cyclingModes[nextModeIndex]);
               setAnimationPhase('full');
               setHighlightedArcIndex(null);
               setHighlightedSide(null);
-              
-              animationRef.current.timer = setTimeout(() => {
-                if (animationRef.current.running && !animationRef.current.isPaused) {
-                  animationRef.current.currentSide = 'left';
-                  animationRef.current.currentIndex = 0;
-                  animate();
-                }
+              setTimeout(() => {
+                setCurrentModeIndex(nextModeIndex);
+                setCurrentSource(cyclingModes[nextModeIndex].source);
+                setCurrentTarget(cyclingModes[nextModeIndex].target);
+                setLastCategoryChange({ source: cyclingModes[nextModeIndex].source, target: cyclingModes[nextModeIndex].target });
+                onRelationshipChange?.(cyclingModes[nextModeIndex].source, cyclingModes[nextModeIndex].target);
+                // Animation will restart due to dependency on currentSource/currentTarget
               }, stepDuration * 2);
             }
           }
@@ -651,6 +608,132 @@ export default function ChordDiagram({
       setHighlightedSide(null);
     };
   }, [autoPlay, settings.isAutoPlayEnabled, data.length, settings.autoPlaySpeed, settings.useTestData]); // Removed currentSource, currentTarget to prevent restarting
+
+  // Restart animation when mode changes (but only if not paused)
+  useEffect(() => {
+    if (autoPlay && settings.isAutoPlayEnabled && data.length && !animationRef.current.isPaused) {
+      console.log('🔄 Mode changed, restarting animation with new mode:', currentSource + ' → ' + currentTarget);
+      
+      // Reset animation state for new mode
+      animationRef.current.currentIndex = 0;
+      animationRef.current.currentSide = 'left';
+      animationRef.current.cycleCount = 0;
+      
+      // Clear any existing timer
+      if (animationRef.current.timer) {
+        clearTimeout(animationRef.current.timer);
+        animationRef.current.timer = null;
+      }
+      
+      // Restart animation if it was running
+      if (animationRef.current.running) {
+        // Call animate function directly to restart with new mode
+        const animate = () => {
+          if (!animationRef.current.running || animationRef.current.isPaused) return;
+
+          // Get current data context (this will adapt to mode changes)
+          const filteredData = settings.useTestData ? data : data.filter(item => !(item as any).test_data);
+          
+          // Define all possible categories for each field (not just those with data)
+          const allCategories = {
+            years_at_medtronic: ['0-5', '6-10', '11-15', '16-20', '20+'],
+            learning_style: ['visual', 'auditory', 'kinesthetic', 'reading_writing'],
+            shaped_by: ['mentor', 'challenge', 'failure', 'success', 'team', 'other'],
+            peak_performance: ['Extrovert, Morning', 'Extrovert, Evening', 'Introvert, Morning', 'Introvert, Night', 'Ambivert, Morning', 'Ambivert, Night'],
+            motivation: ['impact', 'growth', 'recognition', 'autonomy', 'purpose']
+          };
+          
+          const leftValues = allCategories[currentSource as keyof typeof allCategories] || [];
+          const rightValues = allCategories[currentTarget as keyof typeof allCategories] || [];
+
+          const currentSideLength = animationRef.current.currentSide === 'left' ? leftValues.length : rightValues.length;
+
+          // Safety check: if current index is out of bounds for new mode, reset to 0
+          if (animationRef.current.currentIndex >= currentSideLength) {
+            animationRef.current.currentIndex = 0;
+          }
+
+          // Debug: Log the current animation state for dev tools
+          console.log('[ChordAnimation] Side:', animationRef.current.currentSide, 'Index:', animationRef.current.currentIndex, 'Total on side:', currentSideLength, 'Mode:', currentSource + ' → ' + currentTarget);
+
+          setAnimationPhase('highlighting');
+          setHighlightedArcIndex(animationRef.current.currentIndex);
+          setHighlightedSide(animationRef.current.currentSide);
+          
+          const highlightedCategory = animationRef.current.currentSide === 'left' 
+            ? leftValues[animationRef.current.currentIndex]
+            : rightValues[animationRef.current.currentIndex];
+          
+          // Check if this category has data
+          const hasData = filteredData.some(d => {
+            if (animationRef.current.currentSide === 'left') {
+              if (currentSource === 'years_at_medtronic') {
+                return getYearsCategory(d.years_at_medtronic || 0) === highlightedCategory;
+              }
+              return (d as any)[currentSource] === highlightedCategory;
+            } else {
+              if (currentTarget === 'years_at_medtronic') {
+                return getYearsCategory(d.years_at_medtronic || 0) === highlightedCategory;
+              }
+              return (d as any)[currentTarget] === highlightedCategory;
+            }
+          });
+          
+          console.log('✨ Highlighting full relationship chain for:', {
+            sourceCategory: highlightedCategory,
+            sourceSide: animationRef.current.currentSide,
+            sourceIndex: animationRef.current.currentIndex,
+            hasData: hasData,
+            totalCategories: currentSideLength
+          });
+
+          // Calculate timing based on global settings - slower for better visibility
+          const stepDuration = Math.max(1500, (settings.autoPlaySpeed || 3000) / 3);
+          const pauseDuration = Math.max(300, stepDuration / 5);
+
+          // Move to next position - include the last index before switching
+          if (animationRef.current.currentIndex < currentSideLength - 1) {
+            animationRef.current.timer = setTimeout(() => {
+              if (animationRef.current.running && !animationRef.current.isPaused) {
+                animationRef.current.currentIndex++;
+                animate();
+              }
+            }, stepDuration + pauseDuration);
+          } else {
+            // Show the last index for the full duration before switching
+            animationRef.current.timer = setTimeout(() => {
+              if (animationRef.current.running && !animationRef.current.isPaused) {
+                // Now switch sides or complete cycle
+                if (animationRef.current.currentSide === 'left') {
+                  animationRef.current.currentSide = 'right';
+                  animationRef.current.currentIndex = 0;
+                  animate();
+                } else {
+                  // Complete cycle - show full diagram briefly, then restart
+                  animationRef.current.cycleCount++;
+                  const nextModeIndex = (currentModeIndex + 1) % cyclingModes.length;
+                  console.log('🎉 ChordAnimation completed full cycle #' + animationRef.current.cycleCount + '! Advancing to mode', nextModeIndex, cyclingModes[nextModeIndex]);
+                  setAnimationPhase('full');
+                  setHighlightedArcIndex(null);
+                  setHighlightedSide(null);
+                  setTimeout(() => {
+                    setCurrentModeIndex(nextModeIndex);
+                    setCurrentSource(cyclingModes[nextModeIndex].source);
+                    setCurrentTarget(cyclingModes[nextModeIndex].target);
+                    setLastCategoryChange({ source: cyclingModes[nextModeIndex].source, target: cyclingModes[nextModeIndex].target });
+                    onRelationshipChange?.(cyclingModes[nextModeIndex].source, cyclingModes[nextModeIndex].target);
+                    // Animation will restart due to dependency on currentSource/currentTarget
+                  }, stepDuration * 2);
+                }
+              }
+            }, stepDuration + pauseDuration);
+          }
+        };
+        
+        animate();
+      }
+    }
+  }, [currentSource, currentTarget, autoPlay, settings.isAutoPlayEnabled, data.length, settings.autoPlaySpeed, settings.useTestData, currentModeIndex]);
 
   // Secondary chord animation system
   useEffect(() => {
@@ -950,136 +1033,29 @@ export default function ChordDiagram({
 
   // Remove conflicting opacity update system - opacity will be handled in main rendering
 
-  // Pause/Resume animation functions (similar to AlluvialDiagram)
-  const pauseAnimation = useCallback((reason: string) => {
-    // Pause main chord animation
-    if (animationRef.current.running && !animationRef.current.isPaused) {
-      console.log('⏸️ Pausing Main Chord animation:', reason);
-      animationRef.current.isPaused = true;
-      if (animationRef.current.timer) {
-        clearTimeout(animationRef.current.timer);
-        animationRef.current.timer = null;
-      }
+  // Add pause/resume functionality
+  const pauseAnimation = (reason: string) => {
+    console.log('⏸️ Pausing animation:', reason);
+    animationRef.current.isPaused = true;
+    secondaryAnimationRef.current.isPaused = true;
+    if (animationRef.current.timer) {
+      clearTimeout(animationRef.current.timer);
+      animationRef.current.timer = null;
     }
+    if (secondaryAnimationRef.current.timer) {
+      clearTimeout(secondaryAnimationRef.current.timer);
+      secondaryAnimationRef.current.timer = null;
+    }
+  };
+
+  const resumeAnimation = (reason: string) => {
+    console.log('▶️ Resuming animation:', reason);
+    animationRef.current.isPaused = false;
+    secondaryAnimationRef.current.isPaused = false;
     
-    // Pause secondary chord animation
-    if (secondaryAnimationRef.current.running && !secondaryAnimationRef.current.isPaused) {
-      console.log('⏸️ Pausing Secondary Chord animation:', reason);
-      secondaryAnimationRef.current.isPaused = true;
-      if (secondaryAnimationRef.current.timer) {
-        clearTimeout(secondaryAnimationRef.current.timer);
-        secondaryAnimationRef.current.timer = null;
-      }
-    }
-  }, []);
-
-  const resumeAnimation = useCallback((reason: string) => {
-    // Resume main chord animation
-    if (animationRef.current.running && animationRef.current.isPaused) {
-      console.log('▶️ Resuming Main Chord animation:', reason);
-      animationRef.current.isPaused = false;
-      
-      // Restart the animation timer immediately
-      const restartMainAnimation = () => {
-        if (!animationRef.current.running || animationRef.current.isPaused) return;
-
-        console.log('🔄 Restarting Main Chord animation after pause');
-        setAnimationPhase('highlighting');
-        setHighlightedArcIndex(animationRef.current.currentIndex);
-        setHighlightedSide(animationRef.current.currentSide);
-        
-        // Calculate timing based on global settings - slower for better visibility
-        const stepDuration = Math.max(1500, (settings.autoPlaySpeed || 3000) / 3);
-        const pauseDuration = Math.max(300, stepDuration / 5);
-
-        // Get current data context
-        const filteredData = settings.useTestData ? data : data.filter(item => !(item as any).test_data);
-        const leftValues = currentSource === 'years_at_medtronic'
-          ? ['0-5', '6-10', '11-15', '16-20', '20+']
-          : Array.from(new Set(filteredData.map(d => (d as any)[currentSource]))).filter(Boolean);
-        const rightValues = currentTarget === 'years_at_medtronic'
-          ? ['0-5', '6-10', '11-15', '16-20', '20+']
-          : Array.from(new Set(filteredData.map(d => (d as any)[currentTarget]))).filter(Boolean);
-
-        const currentSideLength = animationRef.current.currentSide === 'left' ? leftValues.length : rightValues.length;
-
-        // Continue animation from current position
-        animationRef.current.timer = setTimeout(() => {
-          if (animationRef.current.running && !animationRef.current.isPaused) {
-            if (animationRef.current.currentIndex < currentSideLength - 1) {
-              animationRef.current.currentIndex++;
-            } else {
-              // Switch sides or restart
-              if (animationRef.current.currentSide === 'left') {
-                animationRef.current.currentSide = 'right';
-                animationRef.current.currentIndex = 0;
-              } else {
-                animationRef.current.currentSide = 'left';
-                animationRef.current.currentIndex = 0;
-              }
-            }
-            restartMainAnimation();
-          }
-        }, stepDuration);
-      };
-      
-      restartMainAnimation();
-    }
-    
-    // Resume secondary chord animation
-    if (secondaryAnimationRef.current.running && secondaryAnimationRef.current.isPaused) {
-      console.log('▶️ Resuming Secondary Chord animation:', reason);
-      secondaryAnimationRef.current.isPaused = false;
-      
-      // Restart the secondary animation timer immediately
-      const restartSecondaryAnimation = () => {
-        if (!secondaryAnimationRef.current.running || secondaryAnimationRef.current.isPaused) return;
-
-        console.log('🔄 Restarting Secondary Chord animation after pause');
-        
-        // Get secondary chord data context
-        const filteredData = settings.useTestData ? data : data.filter(item => !(item as any).test_data);
-        const secondaryData = filteredData.filter(d => (d as any).peak_performance);
-        const yearsCategories = ['0-5', '6-10', '11-15', '16-20', '20+'];
-        const peakPerfCategories = Array.from(new Set(secondaryData.map(d => (d as any).peak_performance))).filter(Boolean).sort();
-        
-        // Calculate the actual arc index based on side and position
-        const actualArcIndex = secondaryAnimationRef.current.currentSide === 'left' 
-          ? secondaryAnimationRef.current.currentIndex 
-          : yearsCategories.length + secondaryAnimationRef.current.currentIndex;
-        
-        setSecondaryAnimationPhase('highlighting');
-        setSecondaryHighlightedArcIndex(actualArcIndex);
-        setSecondaryHighlightedSide(secondaryAnimationRef.current.currentSide);
-        
-        // Calculate timing based on global settings - slower for better visibility
-        const stepDuration = Math.max(1500, (settings.autoPlaySpeed || 3000) / 3);
-        const pauseDuration = Math.max(300, stepDuration / 5);
-        const currentSideLength = secondaryAnimationRef.current.currentSide === 'left' ? yearsCategories.length : peakPerfCategories.length;
-
-        // Continue animation from current position
-        secondaryAnimationRef.current.timer = setTimeout(() => {
-          if (secondaryAnimationRef.current.running && !secondaryAnimationRef.current.isPaused) {
-            if (secondaryAnimationRef.current.currentIndex < currentSideLength - 1) {
-              secondaryAnimationRef.current.currentIndex++;
-            } else {
-              // Switch sides or restart
-              if (secondaryAnimationRef.current.currentSide === 'left') {
-                secondaryAnimationRef.current.currentSide = 'right';
-                secondaryAnimationRef.current.currentIndex = 0;
-              } else {
-                secondaryAnimationRef.current.currentSide = 'left';
-                secondaryAnimationRef.current.currentIndex = 0;
-              }
-            }
-            restartSecondaryAnimation();
-          }
-        }, stepDuration);
-      };
-      
-      restartSecondaryAnimation();
-    }
-  }, [settings.autoPlaySpeed, settings.useTestData, data, currentSource, currentTarget]);
+    // The mode change useEffect will automatically restart the animation
+    // when isPaused becomes false and mode changes
+  };
 
   // Check if container is too small
   const margin = { top: 80, right: 80, bottom: 100, left: 80 };
@@ -1324,8 +1300,6 @@ export default function ChordDiagram({
       .attr('fill', (d, i) => `url(#left-arc-gradient-${i})`)
       .attr('opacity', 0)
       .on('mouseenter', function(event, d: any) {
-        if (d.value === 0) return;
-        
         pauseAnimation('left arc hover');
         
         // Trigger the same highlighting as auto-cycle animation
@@ -1425,7 +1399,6 @@ export default function ChordDiagram({
       .attr('fill', (d, i) => `url(#right-arc-gradient-${i})`)
       .attr('opacity', 0)
       .on('mouseenter', function(event, d: any) {
-        if (d.value === 0) return;
         pauseAnimation('arc hover');
         
         // Trigger the same highlighting as auto-cycle animation
