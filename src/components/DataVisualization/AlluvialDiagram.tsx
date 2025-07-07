@@ -824,21 +824,21 @@ export default function AlluvialDiagram({
           // Source nodes: only the highlighted one is bright
           if (d.category === currentSource) {
             if (hoveredSourceIndex !== null && animationPhase === 'highlighting') {
-              return d.name === sortedSources[hoveredSourceIndex] ? 1 : 0.2;
+              return d.name === sortedSources[hoveredSourceIndex] ? 1 : 0.3;
             }
-            return 0.6;
+            return 0.9; // Increased from 0.6 to 0.9 for more prominence
           }
           // Target nodes: only those connected to the highlighted source or hovered target are bright
           if (hoveredSourceIndex !== null && animationPhase === 'highlighting') {
             const hoveredSource = sortedSources[hoveredSourceIndex];
             const isConnected = filteredLinks.some(l => l.source.name === hoveredSource && l.target.name === d.name);
-            return isConnected ? 1 : 0.2;
+            return isConnected ? 1 : 0.3;
           }
           if (hoveredTargetIndex !== null && animationPhase === 'highlighting') {
             const hoveredTarget = sortedTargets[hoveredTargetIndex];
-            return d.name === hoveredTarget ? 1 : 0.2;
+            return d.name === hoveredTarget ? 1 : 0.3;
           }
-          return 0.6;
+          return 0.9; // Increased from 0.6 to 0.9 for more prominence
         })
         .on('mousemove', function (event: any, d: any) {
           setHoveredNode(d);
@@ -891,21 +891,21 @@ export default function AlluvialDiagram({
           // Source nodes: only the highlighted one is bright
           if (d.category === currentSource) {
             if (hoveredSourceIndex !== null && animationPhase === 'highlighting') {
-              return d.name === sortedSources[hoveredSourceIndex] ? 1 : 0.2;
+              return d.name === sortedSources[hoveredSourceIndex] ? 1 : 0.3;
             }
-            return 0.6;
+            return 0.9; // Increased from 0.6 to 0.9 for more prominence
           }
           // Target nodes: only those connected to the highlighted source or hovered target are bright
           if (hoveredSourceIndex !== null && animationPhase === 'highlighting') {
             const hoveredSource = sortedSources[hoveredSourceIndex];
             const isConnected = filteredLinks.some(l => l.source.name === hoveredSource && l.target.name === d.name);
-            return isConnected ? 1 : 0.2;
+            return isConnected ? 1 : 0.3;
           }
           if (hoveredTargetIndex !== null && animationPhase === 'highlighting') {
             const hoveredTarget = sortedTargets[hoveredTargetIndex];
-            return d.name === hoveredTarget ? 1 : 0.2;
+            return d.name === hoveredTarget ? 1 : 0.3;
           }
-          return 0.6;
+          return 0.9; // Increased from 0.6 to 0.9 for more prominence
         })
     );
 
@@ -1001,9 +1001,9 @@ export default function AlluvialDiagram({
         // Source nodes: only the highlighted one is bright
         if (d.category === currentSource) {
           if (hoveredSourceIndex !== null && animationPhase === 'highlighting') {
-            return d.name === sortedSources[hoveredSourceIndex] ? 1 : 0.15; // More dramatic contrast
+            return d.name === sortedSources[hoveredSourceIndex] ? 1 : 0.2; // Slightly higher for better visibility
           }
-          return 0.6;
+          return 0.9; // Increased from 0.6 to 0.9 for more prominence
         }
         // Target nodes: highlight those connected to the highlighted source
         if (hoveredSourceIndex !== null && animationPhase === 'highlighting') {
@@ -1012,13 +1012,13 @@ export default function AlluvialDiagram({
           const isConnected = svg.selectAll('path').data().some((link: any) => 
             link.source.name === hoveredSource && link.target.name === d.name
           );
-          return isConnected ? 1 : 0.15; // More dramatic contrast
+          return isConnected ? 1 : 0.2; // Slightly higher for better visibility
         }
         if (hoveredTargetIndex !== null && animationPhase === 'highlighting') {
           const hoveredTarget = sortedTargetsForHighlight[hoveredTargetIndex];
-          return d.name === hoveredTarget ? 1 : 0.15;
+          return d.name === hoveredTarget ? 1 : 0.2;
         }
-        return 0.6;
+        return 0.9; // Increased from 0.6 to 0.9 for more prominence
       })
       .attr('stroke-width', function(d: any) {
         // Add thicker stroke to highlighted source node
@@ -1324,8 +1324,8 @@ export default function AlluvialDiagram({
         />
       </div>
       
-      {/* Debug Panel - Only show in development */}
-      {process.env.NODE_ENV === 'development' && (
+      {/* Debug Panel - Disabled for production */}
+      {false && (
         <div className="w-full px-4 mb-4">
           <div className={`p-3 rounded text-xs font-mono transition-colors duration-200 ${
             settings.isDarkMode ? 'bg-gray-800 text-gray-100' : 'bg-gray-100 text-gray-900'
