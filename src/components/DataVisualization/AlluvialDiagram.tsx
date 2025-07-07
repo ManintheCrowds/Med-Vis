@@ -148,32 +148,38 @@ export default function AlluvialDiagram({
     return '20+';
   };
 
+  // Filter data based on test data setting
+  const filteredData = useMemo(() => {
+    if (!Array.isArray(data) || !data.length) return [];
+    return settings.useTestData ? data : data.filter(item => !(item as any).test_data);
+  }, [data, settings.useTestData]);
+
   // Compute sources and targets with validation
   const sources: string[] = useMemo(() => {
-    if (!Array.isArray(data) || !data.length) return [];
+    if (!Array.isArray(filteredData) || !filteredData.length) return [];
     if (currentSource === 'years_at_medtronic') {
       return YEARS_CATEGORIES.filter(cat => 
-        data.some(d => getValidYearsCategory(d.years_at_medtronic || 0) === cat)
+        filteredData.some(d => getValidYearsCategory(d.years_at_medtronic || 0) === cat)
       );
     } else {
       return Array.from(new Set(
-        data.map((d: SurveyResponse) => d[currentSource as keyof SurveyResponse])
+        filteredData.map((d: SurveyResponse) => d[currentSource as keyof SurveyResponse])
       )).filter((value): value is string => 
         typeof value === 'string' && value.length > 0
       );
     }
-  }, [data, currentSource]);
+  }, [filteredData, currentSource]);
 
   const targets: string[] = useMemo(() => {
-    if (!Array.isArray(data) || !data.length) return [];
+    if (!Array.isArray(filteredData) || !filteredData.length) return [];
     if (currentTarget === 'years_at_medtronic') {
       return YEARS_CATEGORIES.filter(cat => 
-        data.some(d => getValidYearsCategory(d.years_at_medtronic || 0) === cat)
+        filteredData.some(d => getValidYearsCategory(d.years_at_medtronic || 0) === cat)
       );
     } else {
       // Sort target nodes consistently to maintain fixed positions
       return Array.from(new Set(
-        data.map((d: SurveyResponse) => 
+        filteredData.map((d: SurveyResponse) => 
         currentTarget === 'years_at_medtronic' 
             ? getValidYearsCategory(d.years_at_medtronic || 0)
             : d[currentTarget as keyof SurveyResponse]
@@ -182,7 +188,7 @@ export default function AlluvialDiagram({
         typeof value === 'string' && value.length > 0
       ).sort(); // Add consistent sorting
     }
-  }, [data, currentTarget]);
+  }, [filteredData, currentTarget]);
 
   // Check for reduced motion preference
   const prefersReducedMotion = useMemo(() => {
@@ -228,7 +234,7 @@ export default function AlluvialDiagram({
 
   // Get visual order of source nodes (top-to-bottom as they appear)
   const sortedSources = useMemo(() => {
-    if (!data.length || !chartWidth || !chartHeight) return sources;
+    if (!filteredData.length || !chartWidth || !chartHeight) return sources;
 
     const sourcesForNodes = [...sources];
     if (currentSource === 'years_at_medtronic') {
@@ -244,7 +250,7 @@ export default function AlluvialDiagram({
     ];
 
     const linksMap = new Map<string, { source: string; target: string; value: number }>(); 
-    data.forEach((d) => {
+    filteredData.forEach((d) => {
       const source = currentSource === 'years_at_medtronic' 
         ? getValidYearsCategory(d.years_at_medtronic || 0) 
         : (d as any)[currentSource];
@@ -282,7 +288,7 @@ export default function AlluvialDiagram({
       .sort((a: any, b: any) => a.y0 - b.y0);
 
     return sourceNodes.map((d: any) => d.name);
-  }, [data, sources, targets, currentSource, currentTarget, chartWidth, chartHeight]);
+  }, [filteredData, sources, targets, currentSource, currentTarget, chartWidth, chartHeight]);
 
   // Enhanced animation function with comprehensive debug tracking
   const animate = useCallback(() => {
@@ -292,10 +298,10 @@ export default function AlluvialDiagram({
       return;
     }
 
-    if (!animationRef.current.running || !data.length) {
+    if (!animationRef.current.running || !filteredData.length) {
       console.log('❌ Animation stopped:', {
         running: animationRef.current.running,
-        dataLength: data.length
+        dataLength: filteredData.length
       });
       return;
     }
@@ -445,7 +451,7 @@ export default function AlluvialDiagram({
 
 
 
-  // Animation effect - only restart on major changes, ignore target changes
+  // Animation effect - restart when settings change
   useEffect(() => {
     console.log('🎬 Animation useEffect triggered:', {
       autoPlay,
@@ -454,6 +460,7 @@ export default function AlluvialDiagram({
       svgRefExists: !!svgRef.current,
       currentSource,
       currentTarget,
+      autoPlaySpeed: settings.autoPlaySpeed,
       isRunning: animationRef.current.running
     });
 
@@ -468,9 +475,8 @@ export default function AlluvialDiagram({
       setIsInFullOpacityState(true);
       return;
     }
-    // Remove isAnimating check to prevent hover interactions from stopping the animation
-    // The animation should only be controlled by autoPlay and settings.isAutoPlayEnabled
-    if (!data.length) {
+    
+    if (!filteredData.length) {
       console.log('❌ No data available for animation');
       return;
     }
@@ -479,23 +485,38 @@ export default function AlluvialDiagram({
       return;
     }
 
-    // Only start animation if not already running
-    if (!animationRef.current.running) {
-      console.log('✅ Starting animation cycle:', {
+    // Restart animation when speed changes or on major changes
+    if (animationRef.current.running) {
+      console.log('🔄 Restarting animation with new settings:', {
         sourceCategory: currentSource,
         totalSources: sortedSources.length,
         totalTargets: availableFields.filter(f => f.value !== currentSource).length,
         speed: settings.autoPlaySpeed + 'ms'
       });
-
-      // Initialize animation state
-      animationRef.current.running = true;
-      animationRef.current.currentSourceIndex = 0;
-      animationRef.current.currentTargetIndex = 0;
-
-      // Start animation
-      animate();
+      
+      // Stop current animation
+      if (animationRef.current.timer) {
+        clearTimeout(animationRef.current.timer);
+        animationRef.current.timer = null;
+      }
+      animationRef.current.running = false;
     }
+
+    // Start new animation cycle
+    console.log('✅ Starting animation cycle:', {
+      sourceCategory: currentSource,
+      totalSources: sortedSources.length,
+      totalTargets: availableFields.filter(f => f.value !== currentSource).length,
+      speed: settings.autoPlaySpeed + 'ms'
+    });
+
+    // Initialize animation state
+    animationRef.current.running = true;
+    animationRef.current.currentSourceIndex = 0;
+    animationRef.current.currentTargetIndex = 0;
+
+    // Start animation
+    animate();
 
     return () => {
       if (animationRef.current.timer) {
@@ -509,9 +530,9 @@ export default function AlluvialDiagram({
   }, [
     autoPlay,
     settings.isAutoPlayEnabled,
-    data.length,
+    settings.autoPlaySpeed, // Add this to restart when speed changes
+    filteredData.length,
     currentSource // Only restart on source changes, not target changes
-    // Removed startAnimation and cleanupAnimation to prevent loops
   ]);
 
   const nodeLabelFontSize = 18; // larger for readability
@@ -522,7 +543,7 @@ export default function AlluvialDiagram({
 
   // Render Sankey diagram
   useEffect(() => {
-    if (!svgRef.current || !data.length) return;
+    if (!svgRef.current || !filteredData.length) return;
 
     // --- Persistent SVG structure ---
     const svg = d3.select<SVGSVGElement, unknown>(svgRef.current);
@@ -566,7 +587,7 @@ export default function AlluvialDiagram({
     }
 
     // Filter data to only include valid values (no additional filtering for peak_performance)
-    const filteredData = data.filter(d =>
+    const validData = filteredData.filter(d =>
       (currentSource !== 'years_at_medtronic' || d.years_at_medtronic !== null) &&
       (currentTarget !== 'years_at_medtronic' || d.years_at_medtronic !== null)
     );
@@ -579,7 +600,7 @@ export default function AlluvialDiagram({
 
     // 3. Build links array (aggregate counts for each source-target pair)
     const linksMap = new Map<string, { source: string; target: string; value: number, isDummy?: boolean }>();
-    filteredData.forEach((d) => {
+    validData.forEach((d) => {
       const source = sourceAccessor(d);
       const target = targetAccessor(d);
       const sourceId = `${currentSource}:${source}`;
@@ -973,7 +994,7 @@ export default function AlluvialDiagram({
       .attr('width', (d: any) => d.x1 - d.x0)
       .attr('fill', (d: any) => getNodeColor(d, getCurrentThemeColors(), settings.isDarkMode));
 
-  }, [data, currentSource, currentTarget, width, height, settings.categoryColors, settings.isDarkMode, lastCategoryChange, getCurrentThemeColors]);
+  }, [filteredData, currentSource, currentTarget, width, height, settings.categoryColors, settings.isDarkMode, lastCategoryChange, getCurrentThemeColors]);
 
   // Create sorted targets for consistent highlighting
   const sortedTargetsForHighlight = useMemo(() => {
@@ -1126,7 +1147,7 @@ export default function AlluvialDiagram({
   // Create sorted sources array for highlighting (same as rendering and animation)
   const sortedSourcesForHighlight = useMemo(() => {
     let visualOrder: string[] = [];
-    if (data.length && chartWidth > 0 && chartHeight > 0) {
+    if (filteredData.length && chartWidth > 0 && chartHeight > 0) {
       const sourcesForNodes = [...sources];
   if (currentSource === 'years_at_medtronic') {
         sourcesForNodes.sort((a, b) => YEARS_CATEGORIES.indexOf(a) - YEARS_CATEGORIES.indexOf(b));
@@ -1138,7 +1159,7 @@ export default function AlluvialDiagram({
         ...targets.map((name) => ({ id: `${currentTarget}:${name}`, name, category: currentTarget })),
       ];
       const linksMap = new Map<string, { source: string; target: string; value: number, isDummy?: boolean }>();
-      data.forEach((d) => {
+      filteredData.forEach((d) => {
         const source = currentSource === 'years_at_medtronic' ? getYearsCategory(d.years_at_medtronic || 0) : (d as any)[currentSource];
         const target = currentTarget === 'years_at_medtronic' ? getYearsCategory(d.years_at_medtronic || 0) : (d as any)[currentTarget];
         const sourceId = `${currentSource}:${source}`;
@@ -1167,7 +1188,7 @@ export default function AlluvialDiagram({
         .map((d: any) => d.name);
     }
     return visualOrder.length ? visualOrder : [...sources];
-  }, [data, currentSource, currentTarget, sources, targets, chartWidth, chartHeight]);
+  }, [filteredData, currentSource, currentTarget, sources, targets, chartWidth, chartHeight]);
 
   // Determine which source or target to highlight based on animation state
   let highlightSourceName: string | null = null;
@@ -1304,7 +1325,7 @@ export default function AlluvialDiagram({
     // The main rendering logic handles all opacity updates
     // This ensures data binding is correct and prevents the undefined error
     
-  }, [data, hoveredSourceIndex, hoveredTargetIndex, animationPhase, sortedSources, targets, currentSource, currentTarget]);
+  }, [filteredData, hoveredSourceIndex, hoveredTargetIndex, animationPhase, sortedSources, targets, currentSource, currentTarget]);
 
   return (
     <div className={`w-full h-full flex flex-col items-start justify-start transition-colors duration-200 ${
