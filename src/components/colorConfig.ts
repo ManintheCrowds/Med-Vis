@@ -4,28 +4,41 @@
 // Shared color configuration for category labels (social orientation, time of day, etc.)
 // Add more as needed for new categories
 export const CATEGORY_COLORS: Record<string, string> = {
-  'ambivert, night': '#8e44ad',
-  'ambivert, morning': '#2980b9',
-  'extrovert, morning': '#27ae60',
-  'introvert, morning': '#f39c12',
-  'introvert, night': '#c0392b',
-  'extrovert, night': '#16a085',
-  // Case/spacing variants
-  'Ambivert, Night': '#8e44ad',
-  'Ambivert, Morning': '#2980b9',
+  // Peak Performance Categories (exact values from survey form)
   'Extrovert, Morning': '#27ae60',
+  'Extrovert, Evening': '#16a085',
   'Introvert, Morning': '#f39c12',
   'Introvert, Night': '#c0392b',
-  'Extrovert, Night': '#16a085',
-  // New categories
+  'Ambivert, Morning': '#2980b9',
+  'Ambivert, Night': '#8e44ad',
+  
+  // Other categories
   'team': '#00b894',
   'success': '#fdcb6e',
-  'extrovert, evening': '#0984e3',
-  // Case/spacing variants
-  'Team': '#00b894',
-  'Success': '#fdcb6e',
-  'Extrovert, Evening': '#0984e3',
-  // Add more variants as needed
+  'mentor': '#e17055',
+  'challenge': '#6c5ce7',
+  'failure': '#d63031',
+  'other': '#636e72',
+  
+  // Learning styles
+  'visual': '#00cec9',
+  'auditory': '#fd79a8',
+  'kinesthetic': '#fdcb6e',
+  'reading_writing': '#74b9ff',
+  
+  // Motivation types
+  'impact': '#00b894',
+  'growth': '#6c5ce7',
+  'recognition': '#fdcb6e',
+  'autonomy': '#fd79a8',
+  'purpose': '#00cec9',
+  
+  // Years at Medtronic
+  '0-5': '#74b9ff',
+  '6-10': '#55a3ff',
+  '11-15': '#3498db',
+  '16-20': '#2980b9',
+  '20+': '#fdcb6e',
 };
 
 export default CATEGORY_COLORS; 

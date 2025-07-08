@@ -1660,7 +1660,7 @@ function ChordDiagramInternal({
       });
 
     // --- Label placement: properly spaced around circle ---
-    const labelRadius = Math.max(120, radius * 1.45); // Even more space for full text labels
+    const labelRadius = Math.max(140, radius * 1.6); // Increased radius for better spacing
     const labelGroup = svg.append('g').attr('transform', `translate(${margin.left + effectiveChartWidth / 2}, ${margin.top + effectiveChartHeight / 2})`);
     
     // Combine all arcs for unified label placement
@@ -1696,40 +1696,41 @@ function ChordDiagramInternal({
       .attr('alignment-baseline', 'middle')
       .style('font-family', labelFontFamily)
       .style('font-weight', labelFontWeight)
-             .style('font-size', d => {
-         // Dynamic font size based on number of labels - larger since we're showing full text
-         const totalLabels = allArcs.length;
-         if (totalLabels > 12) return '13px';
-         if (totalLabels > 10) return '14px';
-         if (totalLabels > 8) return '15px';
-         return `${Math.max(16, labelFontSize)}px`;
-       })
-       .style('fill', labelColor)
-       .style('text-transform', 'uppercase')
-       .text(d => {
-         const text = (d.name || 'Unknown').toString().replace(/_/g, ' ');
-         // Show full text - no truncation
-         return text;
-       })
-       .on('mouseenter', function(event, d) {
-         pauseAnimation('label hover');
-         const fullText = (d.name || 'Unknown').toString().replace(/_/g, ' ');
-         setTooltip({
-           x: event.pageX,
-           y: event.pageY,
-           content: (
-             <div>
-               <div style={{ fontWeight: 'bold', marginBottom: 4 }}>{fullText}</div>
-               <div>Count: {d.value}</div>
-               <div>Side: {d.side}</div>
-             </div>
-           )
-         });
-       })
-       .on('mouseleave', () => {
-         resumeAnimation('label hover end');
-         setTooltip(null);
-       });
+      .style('font-size', d => {
+        // Dynamic font size based on number of labels - larger since we're showing full text
+        const totalLabels = allArcs.length;
+        if (totalLabels > 12) return '13px';
+        if (totalLabels > 10) return '14px';
+        if (totalLabels > 8) return '15px';
+        return `${Math.max(16, labelFontSize)}px`;
+      })
+      .style('fill', labelColor)
+      .style('text-transform', 'uppercase')
+      .style('text-shadow', '0 1px 2px rgba(0,0,0,0.1)') // Add subtle shadow for better readability
+      .text(d => {
+        const text = (d.name || 'Unknown').toString().replace(/_/g, ' ');
+        // Show full text - no truncation
+        return text;
+      })
+      .on('mouseenter', function(event, d) {
+        pauseAnimation('label hover');
+        const fullText = (d.name || 'Unknown').toString().replace(/_/g, ' ');
+        setTooltip({
+          x: event.pageX,
+          y: event.pageY,
+          content: (
+            <div>
+              <div style={{ fontWeight: 'bold', marginBottom: 4 }}>{fullText}</div>
+              <div>Count: {d.value}</div>
+              <div>Side: {d.side}</div>
+            </div>
+          )
+        });
+      })
+      .on('mouseleave', () => {
+        resumeAnimation('label hover end');
+        setTooltip(null);
+      });
 
     // Update insights
     const totalConnections = connections.reduce((sum, d) => sum + d.value, 0);
@@ -1820,7 +1821,7 @@ function ChordDiagramInternal({
         </div>
         <div 
           className="w-full flex justify-center items-center relative"
-          style={{ height: height * 0.85 }} // Use 85% of available height for the chart to account for labels
+          style={{ height: height * 0.9 }} // Updated to match SVG height
         >
           {showSecondaryChord ? (
             // Two-chord layout when peak performance is involved
@@ -1853,7 +1854,7 @@ function ChordDiagramInternal({
             <svg
               ref={svgRef}
               width={width}
-              height={height * 0.85}
+              height={height * 0.9} // Increased from 0.85 to 0.9 for more label space
               style={{ display: 'block', margin: '0 auto', background: 'transparent', color: textColor }}
             />
           )}

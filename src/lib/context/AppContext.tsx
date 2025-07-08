@@ -34,76 +34,80 @@ export interface VisualizationSettings {
 // Default light mode colors
 const defaultLightColors: CategoryColors = {
   years_at_medtronic: {
-    '0-5': '#FF6B6B',
-    '6-10': '#4ECDC4',
-    '11-15': '#45B7D1',
-    '16-20': '#96CEB4',
-    '20+': '#FFEAA7'
+    '0-5': '#74b9ff',
+    '6-10': '#55a3ff',
+    '11-15': '#3498db',
+    '16-20': '#2980b9',
+    '20+': '#fdcb6e'
   },
   peak_performance: {
-    'individual': '#FF6B6B',
-    'innovation': '#4ECDC4',
-    'leadership': '#45B7D1',
-    'crisis': '#96CEB4',
-    'team': '#FFEAA7'
+    'Extrovert, Morning': '#27ae60',
+    'Extrovert, Evening': '#16a085',
+    'Introvert, Morning': '#f39c12',
+    'Introvert, Night': '#c0392b',
+    'Ambivert, Morning': '#2980b9',
+    'Ambivert, Night': '#8e44ad'
   },
   learning_style: {
-    'visual': '#FF6B6B',
-    'auditory': '#4ECDC4',
-    'kinesthetic': '#45B7D1',
-    'reading_writing': '#96CEB4'
+    'visual': '#00cec9',
+    'auditory': '#fd79a8',
+    'kinesthetic': '#fdcb6e',
+    'reading_writing': '#74b9ff'
   },
   motivation: {
-    'autonomy': '#FF6B6B',
-    'recognition': '#4ECDC4',
-    'impact': '#45B7D1',
-    'purpose': '#96CEB4',
-    'growth': '#FFEAA7'
+    'impact': '#00b894',
+    'growth': '#6c5ce7',
+    'recognition': '#fdcb6e',
+    'autonomy': '#fd79a8',
+    'purpose': '#00cec9'
   },
   shaped_by: {
-    'mentor': '#FF6B6B',
-    'other': '#4ECDC4',
-    'failure': '#45B7D1',
-    'education': '#96CEB4',
-    'challenge': '#FFEAA7'
+    'mentor': '#e17055',
+    'challenge': '#6c5ce7',
+    'failure': '#d63031',
+    'success': '#fdcb6e',
+    'team': '#00b894',
+    'other': '#636e72'
   }
 };
 
 // Default dark mode colors - enhanced versions with better contrast
 const defaultDarkColors: CategoryColors = {
   years_at_medtronic: {
-    '0-5': '#FF8A8A',
-    '6-10': '#6EDCD4',
-    '11-15': '#65C7F1',
-    '16-20': '#B6DEC4',
-    '20+': '#FFED87'
+    '0-5': '#8ac4ff',
+    '6-10': '#75b3ff',
+    '11-15': '#5aa8eb',
+    '16-20': '#4a90c9',
+    '20+': '#fddb8e'
   },
   peak_performance: {
-    'individual': '#FF8A8A',
-    'innovation': '#6EDCD4',
-    'leadership': '#65C7F1',
-    'crisis': '#B6DEC4',
-    'team': '#FFED87'
+    'Extrovert, Morning': '#2ecc71',
+    'Extrovert, Evening': '#1abc9c',
+    'Introvert, Morning': '#f1c40f',
+    'Introvert, Night': '#e74c3c',
+    'Ambivert, Morning': '#3498db',
+    'Ambivert, Night': '#9b59b6'
   },
   learning_style: {
-    'visual': '#FF8A8A',
-    'auditory': '#6EDCD4',
-    'kinesthetic': '#65C7F1',
-    'reading_writing': '#B6DEC4'
+    'visual': '#00d4cf',
+    'auditory': '#fd8bb8',
+    'kinesthetic': '#fddb8e',
+    'reading_writing': '#8ac4ff'
   },
   motivation: {
-    'autonomy': '#FF8A8A',
-    'recognition': '#6EDCD4',
-    'impact': '#65C7F1',
-    'purpose': '#B6DEC4',
-    'growth': '#FFED87'
+    'impact': '#00d4a4',
+    'growth': '#7c6cf7',
+    'recognition': '#fddb8e',
+    'autonomy': '#fd8bb8',
+    'purpose': '#00d4cf'
   },
   shaped_by: {
-    'mentor': '#FF8A8A',
-    'other': '#6EDCD4',
-    'failure': '#65C7F1',
-    'education': '#B6DEC4',
-    'challenge': '#FFED87'
+    'mentor': '#e17a65',
+    'challenge': '#7c6cf7',
+    'failure': '#e74c3c',
+    'success': '#fddb8e',
+    'team': '#00d4a4',
+    'other': '#7c8c8c'
   }
 };
 
