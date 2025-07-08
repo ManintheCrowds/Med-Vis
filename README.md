@@ -551,3 +551,14 @@ For technical support or questions:
 ---
 
 **Built with ❤️ for the Medtronic WE Summit** 
+
+## Features
+
+- **Interactive Data Visualizations**: Chord diagrams, alluvial diagrams, and constellation views
+- **Admin-Driven Color Configuration**: Centralized color management through `/admin/controls`
+- **Peak Performance Analysis**: Track personality types and optimal performance times
+- **Real-time Data Updates**: Live data synchronization with Supabase
+- **Responsive Design**: Works on desktop and mobile devices
+- **Dark/Light Theme Support**: Automatic theme switching with custom colors
+- **Export Capabilities**: Download visualizations as images or data
+- **Survey Management**: Complete survey response tracking and analysis 

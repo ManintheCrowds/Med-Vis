@@ -11,6 +11,7 @@
 - [Performance Guidelines](#performance-guidelines)
 - [Security Best Practices](#security-best-practices)
 - [Deployment](#deployment)
+- [Color System](#color-system)
 
 ## Getting Started
 
@@ -1073,5 +1074,42 @@ jobs:
           # Deploy script here
           echo "Deploying to production..."
 ```
+
+## Color System
+
+### Admin-Driven Color Configuration
+All visualization colors are managed through the admin panel at `/admin/controls`. This ensures:
+- **Centralized Management**: All colors controlled from one interface
+- **Real-time Updates**: Changes apply immediately without code deployment
+- **Theme Support**: Separate colors for light and dark modes
+- **Consistency**: All visualizations use the same color scheme
+
+### Peak Performance Categories
+The system supports six peak performance categories:
+```typescript
+type PeakPerformance = 
+  | 'Extrovert, Morning'
+  | 'Extrovert, Evening' 
+  | 'Introvert, Morning'
+  | 'Introvert, Night'
+  | 'Ambivert, Morning'
+  | 'Ambivert, Night';
+```
+
+### Color Usage Pattern
+```typescript
+// Always use the admin-driven color map
+const color = getNodeColor(
+  { category: 'peak_performance', name: 'Extrovert, Morning' },
+  settings.categoryColors[settings.isDarkMode ? 'dark' : 'light'],
+  settings.isDarkMode
+);
+```
+
+### Adding New Categories
+1. Update the survey form to include new options
+2. Add the category to the admin color configuration
+3. Update type definitions in `types/survey.ts`
+4. Ensure all visualizations use `getNodeColor()` for consistency
 
 This developer guide provides a comprehensive foundation for working with the Medtronic WE Summit visualization platform. Follow these patterns and practices to maintain code quality and consistency across the project. 

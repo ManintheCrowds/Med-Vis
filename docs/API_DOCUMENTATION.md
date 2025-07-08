@@ -65,9 +65,9 @@ POST /api/survey
   "attendeeId": "uuid",
   "years_at_medtronic": 5,
   "learning_style": "visual",
-  "motivation": "career_growth",
-  "peak_performance": "morning",
-  "shaped_by": "mentorship",
+  "motivation": "impact",
+  "peak_performance": "Extrovert, Morning",
+  "shaped_by": "mentor",
   "test_data": false
 }
 ```
@@ -82,9 +82,9 @@ POST /api/survey
     "attendeeId": "uuid",
     "years_at_medtronic": 5,
     "learning_style": "visual",
-    "motivation": "career_growth",
-    "peak_performance": "morning",
-    "shaped_by": "mentorship",
+    "motivation": "impact",
+    "peak_performance": "Extrovert, Morning",
+    "shaped_by": "mentor",
     "test_data": false,
     "created_at": "2024-01-15T10:30:00Z",
     "updated_at": "2024-01-15T10:30:00Z"
@@ -97,9 +97,9 @@ POST /api/survey
 - `attendeeId`: Required UUID
 - `years_at_medtronic`: Integer between 0 and 50
 - `learning_style`: One of ["visual", "auditory", "kinesthetic", "reading_writing"]
-- `motivation`: One of ["career_growth", "skill_development", "networking", "recognition"]
-- `peak_performance`: One of ["morning", "afternoon", "evening", "night"]
-- `shaped_by`: One of ["mentorship", "experience", "education", "collaboration"]
+- `motivation`: One of ["impact", "growth", "recognition", "autonomy", "purpose"]
+- `peak_performance`: One of ["Extrovert, Morning", "Extrovert, Evening", "Introvert, Morning", "Introvert, Night", "Ambivert, Morning", "Ambivert, Night"]
+- `shaped_by`: One of ["mentor", "challenge", "failure", "success", "team", "other"]
 
 #### Get Survey Responses
 
@@ -138,9 +138,9 @@ GET /api/survey?limit=25&offset=0&learningStyle=visual&sortBy=created_at&sortOrd
       "attendeeId": "uuid",
       "years_at_medtronic": 5,
       "learning_style": "visual",
-      "motivation": "career_growth",
-      "peak_performance": "morning",
-      "shaped_by": "mentorship",
+      "motivation": "impact",
+      "peak_performance": "Extrovert, Morning",
+      "shaped_by": "mentor",
       "test_data": false,
       "created_at": "2024-01-15T10:30:00Z",
       "updated_at": "2024-01-15T10:30:00Z",
@@ -180,9 +180,9 @@ GET /api/survey/{id}
     "attendeeId": "uuid",
     "years_at_medtronic": 5,
     "learning_style": "visual",
-    "motivation": "career_growth",
-    "peak_performance": "morning",
-    "shaped_by": "mentorship",
+    "motivation": "impact",
+    "peak_performance": "Extrovert, Morning",
+    "shaped_by": "mentor",
     "test_data": false,
     "created_at": "2024-01-15T10:30:00Z",
     "updated_at": "2024-01-15T10:30:00Z",
@@ -211,7 +211,7 @@ PUT /api/survey/{id}
 {
   "years_at_medtronic": 6,
   "learning_style": "auditory",
-  "motivation": "skill_development"
+  "motivation": "growth"
 }
 ```
 
@@ -225,9 +225,9 @@ PUT /api/survey/{id}
     "attendeeId": "uuid",
     "years_at_medtronic": 6,
     "learning_style": "auditory",
-    "motivation": "skill_development",
-    "peak_performance": "morning",
-    "shaped_by": "mentorship",
+    "motivation": "growth",
+    "peak_performance": "Extrovert, Morning",
+    "shaped_by": "mentor",
     "test_data": false,
     "created_at": "2024-01-15T10:30:00Z",
     "updated_at": "2024-01-15T11:45:00Z"
@@ -576,7 +576,7 @@ Content-Type: text/csv
 Content-Disposition: attachment; filename="survey_responses_2024-01-15.csv"
 
 id,attendee_name,years_at_medtronic,learning_style,motivation,created_at
-uuid,John Doe,5,visual,career_growth,2024-01-15T10:30:00Z
+uuid,John Doe,5,visual,impact,2024-01-15T10:30:00Z
 ```
 
 ### Test Data Management
@@ -650,9 +650,9 @@ interface SurveyResponse {
   attendeeId: string;
   years_at_medtronic: number;
   learning_style: 'visual' | 'auditory' | 'kinesthetic' | 'reading_writing';
-  motivation: 'career_growth' | 'skill_development' | 'networking' | 'recognition';
-  peak_performance: 'morning' | 'afternoon' | 'evening' | 'night';
-  shaped_by: 'mentorship' | 'experience' | 'education' | 'collaboration';
+  motivation: 'impact' | 'growth' | 'recognition' | 'autonomy' | 'purpose';
+  peak_performance: 'Extrovert, Morning' | 'Extrovert, Evening' | 'Introvert, Morning' | 'Introvert, Night' | 'Ambivert, Morning' | 'Ambivert, Night';
+  shaped_by: 'mentor' | 'challenge' | 'failure' | 'success' | 'team' | 'other';
   test_data: boolean;
   created_at: string;
   updated_at: string;
@@ -782,7 +782,7 @@ const response = await api.survey.submit({
   attendeeId: 'uuid',
   years_at_medtronic: 5,
   learning_style: 'visual',
-  motivation: 'career_growth'
+  motivation: 'impact'
 });
 
 // Get visualization data
@@ -808,7 +808,7 @@ response = api.survey.submit({
     'attendeeId': 'uuid',
     'years_at_medtronic': 5,
     'learning_style': 'visual',
-    'motivation': 'career_growth'
+    'motivation': 'impact'
 })
 
 # Get visualization data

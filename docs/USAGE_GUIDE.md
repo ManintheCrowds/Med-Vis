@@ -536,4 +536,29 @@ pm2 start ecosystem.config.js
 - **Technical Support**: tech-support@medtronic.com
 - **Survey Administration**: survey-admin@medtronic.com
 - **Training Requests**: training@medtronic.com
-- **General Questions**: we-summit@medtronic.com 
+- **General Questions**: we-summit@medtronic.com
+
+## Peak Performance Analysis
+
+The system tracks peak performance patterns based on personality type and time of day:
+
+### Peak Performance Categories
+- **Extrovert, Morning**: Extroverts who perform best in morning hours
+- **Extrovert, Evening**: Extroverts who perform best in evening hours  
+- **Introvert, Morning**: Introverts who perform best in morning hours
+- **Introvert, Night**: Introverts who perform best at night
+- **Ambivert, Morning**: Ambiverts who perform best in morning hours
+- **Ambivert, Night**: Ambiverts who perform best at night
+
+### Color Configuration
+All visualization colors are managed through the admin panel at `/admin/controls`. Admins can:
+- Customize colors for each category
+- Set different colors for light and dark themes
+- Update colors in real-time without code changes
+- Ensure consistency across all visualizations
+
+### Visualization Features
+- **Chord Diagram**: Shows relationships between peak performance and other factors
+- **Alluvial Diagram**: Displays flow patterns across different categories
+- **Interactive Controls**: Filter and explore data relationships
+- **Real-time Updates**: Colors update immediately when changed in admin panel 

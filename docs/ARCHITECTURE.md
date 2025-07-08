@@ -424,4 +424,35 @@ class ErrorBoundary extends React.Component {
 
 ## Conclusion
 
-This architecture provides a solid foundation for the Medtronic WE Summit Visualization Platform, balancing performance, maintainability, and scalability. The modular design allows for easy extension and modification while maintaining code quality and user experience standards. 
+This architecture provides a solid foundation for the Medtronic WE Summit Visualization Platform, balancing performance, maintainability, and scalability. The modular design allows for easy extension and modification while maintaining code quality and user experience standards.
+
+### Survey Response Data Model
+```typescript
+interface SurveyResponse {
+  id: string;
+  attendeeId: string;
+  years_at_medtronic: number;
+  learning_style: 'visual' | 'auditory' | 'kinesthetic' | 'reading_writing';
+  motivation: 'impact' | 'growth' | 'recognition' | 'autonomy' | 'purpose';
+  peak_performance: 'Extrovert, Morning' | 'Extrovert, Evening' | 'Introvert, Morning' | 'Introvert, Night' | 'Ambivert, Morning' | 'Ambivert, Night';
+  shaped_by: 'mentor' | 'challenge' | 'failure' | 'success' | 'team' | 'other';
+  test_data: boolean;
+  created_at: string;
+  updated_at: string;
+  attendee?: Attendee;
+}
+```
+
+### Color Management Architecture
+The color system is designed for admin-driven configuration:
+
+1. **Admin Panel** (`/admin/controls`): Central interface for color management
+2. **AppContext**: Stores color configurations for light/dark themes
+3. **Visualization Components**: Use `getNodeColor()` to retrieve colors
+4. **Real-time Updates**: Changes apply immediately without page refresh
+
+This architecture ensures:
+- **Consistency**: All visualizations use the same color scheme
+- **Flexibility**: Colors can be changed without code deployment
+- **Accessibility**: Support for both light and dark themes
+- **Maintainability**: Centralized color management 
