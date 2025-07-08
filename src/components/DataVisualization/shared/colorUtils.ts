@@ -135,24 +135,17 @@ export const getSequentialColorScale = (isDarkMode: boolean = false) => {
     .domain([0, 1]);
 };
 
-// Helper function to get color for a node using theme-aware global colors
-export function getNodeColor(node: any, globalColors: CategoryColors, isDarkMode: boolean = false): string {
-  let baseColor = getThemeColors(isDarkMode).primary;
-  
-  // Use global colors if available, otherwise fall back to theme-aware defaults
-  if (node.category === 'years_at_medtronic') {
-    baseColor = globalColors.years_at_medtronic?.[node.name] || getYearsColorScale(isDarkMode)(node.name);
-  } else if (node.category === 'learning_style') {
-    baseColor = globalColors.learning_style?.[node.name] || getLearningStyleColors(isDarkMode)(node.name);
-  } else if (node.category === 'peak_performance') {
-    baseColor = globalColors.peak_performance?.[node.name] || getPeakPerformanceColors(isDarkMode)(node.name);
-  } else if (node.category === 'motivation') {
-    baseColor = globalColors.motivation?.[node.name] || getMotivationColors(isDarkMode)(node.name);
-  } else if (node.category === 'shaped_by') {
-    baseColor = globalColors.shaped_by?.[node.name] || getShapedByColors(isDarkMode)(node.name);
-  }
-  
-  return baseColor;
+// Helper function to get color for a node using ONLY the admin-driven color map
+// This function must NOT use any static color scales for user-customizable categories.
+export function getNodeColor(node: { category: string, name: string }, globalColors: CategoryColors, isDarkMode: boolean = false): string {
+  // Always use the admin-driven color map as the source of truth
+  // Fallback to a neutral gray if not found
+  return (
+    globalColors[node.category]?.[node.name] ||
+    globalColors[node.category]?.[node.name.toLowerCase()] ||
+    globalColors[node.category]?.[node.name.toUpperCase()] ||
+    '#888888' // fallback color
+  );
 }
 
 // Accessibility utilities

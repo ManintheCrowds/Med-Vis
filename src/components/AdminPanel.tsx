@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSupabaseClient } from "@supabase/auth-helpers-react";
+import { CATEGORY_COLORS } from './colorConfig';
 
 interface SurveyResponse {
   id: string;
@@ -20,6 +21,9 @@ export function AdminPanel() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tagValues, setTagValues] = useState<Record<string, string>>({});
+  const [newCategory, setNewCategory] = useState("");
+  const [newColor, setNewColor] = useState("#888888");
+  const [localColors, setLocalColors] = useState({ ...CATEGORY_COLORS });
 
   // Fetch pending responses
   useEffect(() => {
@@ -56,6 +60,14 @@ export function AdminPanel() {
       .eq("id", id);
     if (error) alert(error.message);
     else setResponses(responses.filter((r) => r.id !== id));
+  };
+
+  const handleAddCategory = () => {
+    if (!newCategory.trim() || !/^#[0-9A-Fa-f]{6}$/.test(newColor)) return;
+    setLocalColors({ ...localColors, [newCategory.trim()]: newColor });
+    setNewCategory("");
+    setNewColor("#888888");
+    // In a real app, also persist to backend or update colorConfig.ts
   };
 
   if (loading) return <div>Loading...</div>;
@@ -104,6 +116,31 @@ export function AdminPanel() {
           </div>
         </div>
       ))}
+      <div className="mb-4 p-4 border rounded bg-gray-50 dark:bg-gray-800">
+        <h3 className="font-bold mb-2">Add New Category Color</h3>
+        <div className="flex items-center space-x-2">
+          <input
+            type="text"
+            placeholder="Category name"
+            value={newCategory}
+            onChange={e => setNewCategory(e.target.value)}
+            className="border p-1 rounded"
+          />
+          <input
+            type="color"
+            value={newColor}
+            onChange={e => setNewColor(e.target.value)}
+            className="w-8 h-8 border rounded"
+          />
+          <button
+            className="bg-blue-600 text-white px-3 py-1 rounded"
+            onClick={handleAddCategory}
+          >
+            Add
+          </button>
+        </div>
+        <div className="mt-2 text-xs text-gray-500">Example: "team", "success", "extrovert, evening"</div>
+      </div>
     </div>
   );
 }

@@ -177,10 +177,12 @@ export function normalizeCategory(category: string, question: string) {
 }
 
 // Process data for chord diagram
+// NOTE: All color assignments must use the admin-driven color map (categoryColors) as the source of truth.
 export function processChordData(
   data: any[],
   sourceField: string,
-  targetField: string
+  targetField: string,
+  categoryColors: any // Pass the admin-driven color map here
 ): ChordMatrix {
   // Get unique categories for source and target
   const sourceCategories = new Set<string>();
@@ -235,19 +237,12 @@ export function processChordData(
   const groups = chordData.groups.map((group, i) => {
     const category = allCategories[i];
     const question = i < sourceCategories.size ? sourceField : targetField;
-    let color = '#1A1A1F';
-    const normCategory = normalizeCategory(category, question);
-    if (question === 'years_at_medtronic') {
-      color = chordColorScales.years_at_medtronic(normCategory as YearsCategory);
-    } else if (question === 'learning_style') {
-      color = chordColorScales.learning_style(normCategory as NonNullable<LearningStyle>);
-    } else if (question === 'shaped_by') {
-      color = chordColorScales.shaped_by(normCategory as NonNullable<ShapedBy>);
-    } else if (question === 'peak_performance') {
-      color = chordColorScales.peak_performance(normCategory as NonNullable<PeakPerformance>);
-    } else if (question === 'motivation') {
-      color = chordColorScales.motivation(normCategory as NonNullable<Motivation>);
-    }
+    // Use only the admin-driven color map for color assignment
+    const color =
+      categoryColors[question]?.[category] ||
+      categoryColors[question]?.[category.toLowerCase()] ||
+      categoryColors[question]?.[category.toUpperCase()] ||
+      '#888888'; // fallback color
     return {
       index: i,
       startAngle: group.startAngle,

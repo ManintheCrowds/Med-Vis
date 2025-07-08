@@ -20,7 +20,7 @@ import {
 } from './shared/chordUtils';
 import { useAppContext } from '@/lib/context/AppContext';
 import GlobalControlsNav from '@/components/shared/GlobalControlsNav';
-import { getYearsCategory } from './shared/colorUtils';
+import { getYearsCategory, getNodeColor } from './shared/colorUtils';
 
 interface ChordDiagramProps {
   width?: number;
@@ -29,30 +29,6 @@ interface ChordDiagramProps {
   onRelationshipChange?: (source: string, target: string) => void;
   enableRotation?: boolean;
   showAllConnections?: boolean;
-}
-
-// Helper to get color for a node using global context (theme-aware)
-function getNodeColor(nodeName: string, category: string, globalColors: any, isDarkMode: boolean = false): string {
-  const themeColors = isDarkMode ? globalColors.dark : globalColors.light;
-  
-  if (category === 'years_at_medtronic') {
-    return themeColors.years_at_medtronic?.[nodeName] || '#FF6B6B';
-  }
-  
-  // Use global colors if available, otherwise fallback to defaults
-  if (category === 'learning_style') {
-    return themeColors.learning_style?.[nodeName] || '#60a5fa';
-  }
-  if (category === 'peak_performance') {
-    return themeColors.peak_performance?.[nodeName] || '#4F8EF7';
-  }
-  if (category === 'motivation') {
-    return themeColors.motivation?.[nodeName] || '#9467bd';
-  }
-  if (category === 'shaped_by') {
-    return themeColors.shaped_by?.[nodeName] || '#1f77b4';
-  }
-  return '#8884d8';
 }
 
 // --- TypeScript Types for Chord Diagram ---
@@ -1151,7 +1127,7 @@ function ChordDiagramInternal({
       : Array.from(new Set(filteredData.map(d => (d as any)[currentTarget]))).filter(Boolean);
 
     // Process data for chord layout
-    const chordData = processChordData(filteredData, currentSource, currentTarget);
+    const chordData = processChordData(filteredData, currentSource, currentTarget, settings.categoryColors[settings.isDarkMode ? 'dark' : 'light']);
     
     // Separate source and target categories
     const sourceCategories = new Set<string>();
@@ -1253,7 +1229,7 @@ function ChordDiagramInternal({
       const endAngle = leftAngle + arcSpan;
       leftAngle = endAngle + minArcSpacing; // Add spacing between arcs
       
-      const color = getNodeColor(value, currentSource, settings.categoryColors, settings.isDarkMode);
+      const color = getNodeColor({ category: currentSource, name: value }, settings.categoryColors[settings.isDarkMode ? 'dark' : 'light'], settings.isDarkMode);
       const opacity = count === 0 ? 0.15 : 0.8;
       return { name: value, value: count, startAngle, endAngle, color, opacity };
     });
@@ -1277,7 +1253,7 @@ function ChordDiagramInternal({
       const endAngle = rightAngle + arcSpan;
       rightAngle = endAngle + minArcSpacing; // Add spacing between arcs
       
-      const color = getNodeColor(value, currentTarget, settings.categoryColors, settings.isDarkMode);
+      const color = getNodeColor({ category: currentTarget, name: value }, settings.categoryColors[settings.isDarkMode ? 'dark' : 'light'], settings.isDarkMode);
       const opacity = count === 0 ? 0.15 : 0.8;
       return { name: value, value: count, startAngle, endAngle, color, opacity };
     });

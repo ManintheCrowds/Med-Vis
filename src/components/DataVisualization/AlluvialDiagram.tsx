@@ -1,3 +1,21 @@
+/**
+ * @fileoverview AlluvialDiagram Component - Interactive Sankey Flow Visualization
+ * 
+ * This component creates an interactive Sankey (Alluvial) diagram using D3.js to visualize
+ * flow relationships between different categories in survey data. It features:
+ * 
+ * - Responsive design with ResizeObserver
+ * - Dynamic node sizing based on data volume
+ * - Animated transitions between different data views
+ * - Interactive highlighting and filtering
+ * - Theme-aware styling (dark/light mode)
+ * - Accessibility features and error handling
+ * 
+ * @author Medtronic WE Summit Team
+ * @version 2.0.0
+ * @since 1.0.0
+ */
+
 'use client';
 
 import React, { useEffect, useRef, useState, useMemo, useCallback, useContext } from 'react';
@@ -9,58 +27,109 @@ import { useVisualizationData } from './shared/useVisualizationData';
 import { VisualizationContainer } from './shared/VisualizationContainer';
 import { DataInsightPanel } from './shared/DataInsightPanel';
 import { getYearsColorScale, getYearsCategory, getNodeColor } from './shared/colorUtils';
-import { QuestionSelector } from './shared/QuestionSelector';
+// import { QuestionSelector } from './shared/QuestionSelector'; // Temporarily disabled
 import { useAppContext } from '@/lib/context/AppContext';
 import type { Database } from '@/lib/supabase/types';
+import { CATEGORY_COLORS } from '../colorConfig';
 
+/**
+ * Props interface for the AlluvialDiagram component
+ */
 interface AlluvialDiagramProps {
+  /** Width of the visualization in pixels (default: 800) */
   width?: number;
+  /** Height of the visualization in pixels (default: 600) */
   height?: number;
+  /** Whether to enable automatic animation cycling (default: true) */
   autoPlay?: boolean;
+  /** Callback fired when the user changes source/target categories */
   onQuestionChange?: (source: string, target: string) => void;
 }
 
+/**
+ * Survey response type with attendee information
+ */
 type SurveyResponse = Database['public']['Tables']['survey_responses']['Row'] & {
   attendee: Database['public']['Tables']['attendees']['Row'];
 };
 
+/**
+ * Sankey node interface representing a category in the flow diagram
+ */
 interface SankeyNode {
+  /** Unique identifier for the node */
   id: string;
+  /** Display name of the node */
   name: string;
+  /** Category this node belongs to (source or target) */
   category: string;
+  /** Left edge x-coordinate */
   x0: number;
+  /** Right edge x-coordinate */
   x1: number;
+  /** Top edge y-coordinate */
   y0: number;
+  /** Bottom edge y-coordinate */
   y1: number;
+  /** Numeric value representing the node's size */
   value: number;
 }
 
+/**
+ * Sankey link interface representing a flow between two nodes
+ */
 interface SankeyLink {
+  /** Source node */
   source: SankeyNode;
+  /** Target node */
   target: SankeyNode;
+  /** Flow value between nodes */
   value: number;
+  /** Visual width of the link */
   width: number;
+  /** Y-coordinate at source node */
   y0: number;
+  /** Y-coordinate at target node */
   y1: number;
 }
 
+/**
+ * Animation state management interface
+ */
 interface AnimationState {
+  /** Timer reference for animation intervals */
   timer: NodeJS.Timeout | null;
+  /** Whether animation is currently running */
   running: boolean;
+  /** Current highlighted source index */
   currentSourceIndex: number;
+  /** Current highlighted target index */
   currentTargetIndex: number;
+  /** Whether animation is paused */
   isPaused: boolean;
+  /** Timestamp when animation was paused */
   pausedAt: number;
+  /** Where to resume animation from */
   resumeFrom: 'source' | 'target' | null;
+  /** Number of animation cycles completed */
   cycleCount: number;
 }
 
+/**
+ * Tooltip state interface
+ */
 interface TooltipState {
+  /** X position of tooltip */
   x: number;
+  /** Y position of tooltip */
   y: number;
+  /** Tooltip content to display */
   content: React.ReactNode;
 }
 
+/**
+ * Available survey fields for visualization
+ */
 const availableFields = [
   { value: 'years_at_medtronic', label: 'Years at Medtronic' },
   { value: 'learning_style', label: 'Learning Style' },
@@ -70,9 +139,16 @@ const availableFields = [
   // Add more fields as needed
 ];
 
+/**
+ * Years at Medtronic category definitions
+ */
 const YEARS_CATEGORIES = ['0-5', '6-10', '11-15', '16-20', '20+'];
 
-// Move this function up so it is defined before use
+/**
+ * Converts numeric years to category string with validation
+ * @param years - Number of years at Medtronic
+ * @returns Category string
+ */
 const getValidYearsCategory = (years: number): string => {
   if (typeof years !== 'number' || isNaN(years) || years < 0) return '0-5';
   if (years <= 5) return '0-5';
@@ -82,9 +158,19 @@ const getValidYearsCategory = (years: number): string => {
   return '20+';
 };
 
-// Custom wave path generator for Sankey links with bounds checking
+/**
+ * Custom wave path generator for Sankey links with bounds checking
+ * Creates a wavy path between source and target nodes for visual appeal
+ * 
+ * @param d - Link data with source/target coordinates
+ * @param waveAmplitude - Amplitude of the wave effect (default: 8)
+ * @param waveFrequency - Frequency of the wave (default: 1.1)
+ * @param chartWidth - Chart width for bounds checking (default: 800)
+ * @param chartHeight - Chart height for bounds checking (default: 600)
+ * @returns SVG path string
+ */
 function sankeyLinkWave(d: any, waveAmplitude = 8, waveFrequency = 1.1, chartWidth = 800, chartHeight = 600) {
-  // d has source/target: {x0, x1, y0, y1}
+  // Extract coordinates from link data
   let x0 = d.source.x1;
   let x1 = d.target.x0;
   let y0 = d.y0;
@@ -106,7 +192,12 @@ function sankeyLinkWave(d: any, waveAmplitude = 8, waveFrequency = 1.1, chartWid
     C${midX},${waveY0} ${midX},${waveY1} ${x1},${y1}`;
 }
 
-// Custom horizontal link generator that clamps y0/y1 to node bounds
+/**
+ * Custom horizontal link generator that clamps y0/y1 to node bounds
+ * Prevents links from extending beyond their source/target nodes
+ * 
+ * @returns Function that generates SVG path for a link
+ */
 function clampedSankeyLinkHorizontal() {
   return function(d: any) {
     // Clamp y0/y1 to node bounds
@@ -123,8 +214,16 @@ function clampedSankeyLinkHorizontal() {
   };
 }
 
-// Note: Using theme-aware getNodeColor function from colorUtils
-
+/**
+ * AlluvialDiagram Component
+ * 
+ * Main component that renders an interactive Sankey diagram showing flow relationships
+ * between survey response categories. Features responsive design, animations, and
+ * interactive controls.
+ * 
+ * @param props - Component props
+ * @returns JSX element
+ */
 export default function AlluvialDiagram({
   width = 800,
   height = 600,
@@ -209,6 +308,43 @@ export default function AlluvialDiagram({
   // Calculate node count for sizing
   const nodeCount = Math.max(sources.length, targets.length, 1);
 
+  // --- Dynamic margin calculation for full label visibility (moved up) ---
+  // Helper to measure text width in px
+  function measureTextWidth(text: string, font: string): number {
+    if (typeof window === 'undefined') return 100; // fallback for SSR
+    if (!(measureTextWidth as any)._canvas) {
+      (measureTextWidth as any)._canvas = document.createElement('canvas');
+    }
+    const canvas = (measureTextWidth as any)._canvas as HTMLCanvasElement;
+    const context = canvas.getContext('2d');
+    if (!context) return 100;
+    context.font = font;
+    return context.measureText(text).width;
+  }
+
+  // Dynamically scale label font size with node height (clamp between 12px and 28px)
+  const labelFontSize = Math.max(12, Math.min(28, Math.floor(nodeCount > 0 ? (containerHeight / nodeCount) * 0.5 : 16)));
+
+  // Font for measuring
+  const labelFont = `bold ${labelFontSize}px Avenir Next World, -apple-system, BlinkMacSystemFont, 'SF Pro', 'Roboto', sans-serif`;
+  const allLabels = [...sources, ...targets];
+  const labelWidths = allLabels.map(label => measureTextWidth(label, labelFont));
+  const maxLabelWidth = Math.max(...labelWidths, 80); // fallback min
+  const labelPadding = 24;
+  // Reduce margins to prevent excessive gaps
+  // Prioritize negative space for dropdowns and index data categories
+  // Minimum left margin for dropdowns: 120px, but allow more for long labels
+  const minDropdownMargin = 120;
+  // Increase left margin to always accommodate the longest label plus extra padding for clarity
+  const extraLabelSpace = 40; // Extra space for visual comfort
+  const maxLeftMargin = 260; // Cap to prevent excessive margin
+  const margin = {
+    top: 60, // Increased for dropdowns
+    right: Math.max(Math.min(maxLabelWidth + labelPadding, 150), minDropdownMargin),
+    bottom: 20,
+    left: Math.min(maxLabelWidth + labelPadding + extraLabelSpace, maxLeftMargin)
+  };
+
   // --- Sparse Data Tuning ---
   // For sparse data, shrink chart and cap node/link size
   let availableHeight = Math.max(MIN_CHART_HEIGHT, Math.min(containerHeight - 40, MAX_CHART_HEIGHT));
@@ -229,32 +365,8 @@ export default function AlluvialDiagram({
   let nodeHeight = Math.floor((availableHeight - (nodeCount + 1) * minPadding) / nodeCount);
   nodeHeight = Math.max(minNodeHeight, Math.min(nodeHeight, maxNodeHeight));
   let nodePadding = (availableHeight - nodeCount * nodeHeight) / (nodeCount + 1);
-  nodePadding = Math.max(nodePadding, minPadding);
-
-  // Dynamically scale label font size with node height (clamp between 12px and 28px)
-  const labelFontSize = Math.max(12, Math.min(28, Math.floor(nodeHeight * 0.5)));
-
-  // --- Dynamic margin calculation for full label visibility ---
-  // Helper to measure text width in px
-  function measureTextWidth(text: string, font: string): number {
-    if (typeof window === 'undefined') return 100; // fallback for SSR
-    if (!(measureTextWidth as any)._canvas) {
-      (measureTextWidth as any)._canvas = document.createElement('canvas');
-    }
-    const canvas = (measureTextWidth as any)._canvas as HTMLCanvasElement;
-    const context = canvas.getContext('2d');
-    if (!context) return 100;
-    context.font = font;
-    return context.measureText(text).width;
-  }
-
-  // Font for measuring
-  const labelFont = `bold ${labelFontSize}px Avenir Next World, -apple-system, BlinkMacSystemFont, 'SF Pro', 'Roboto', sans-serif`;
-  const allLabels = [...sources, ...targets];
-  const labelWidths = allLabels.map(label => measureTextWidth(label, labelFont));
-  const maxLabelWidth = Math.max(...labelWidths, 80); // fallback min
-  const labelPadding = 24;
-  const margin = { top: 20, right: maxLabelWidth + labelPadding, bottom: 20, left: maxLabelWidth + labelPadding };
+  // Clamp nodePadding to a maximum to prevent excessive vertical gaps
+  nodePadding = Math.max(minPadding, Math.min(nodePadding, 40));
 
   // Responsive chart width
   let chartWidth = Math.max(MIN_CHART_WIDTH, Math.min(containerWidth - margin.left - margin.right, MAX_CHART_WIDTH));
@@ -270,16 +382,26 @@ export default function AlluvialDiagram({
     chartWidth = Math.min(MAX_CHART_WIDTH, Math.max(chartWidth, 900));
   }
 
+  // --- Sankey layout: ensure leftmost nodes are flush with the left edge ---
+  // The sankey extent is [[0,0],[chartWidth,chartHeight]] and the group transform is translate(margin.left, margin.top)
+  // This ensures x0=0 for leftmost nodes, so connectors start flush with the left edge of the chart area
+  // (No code change needed here if extent and transform are correct)
+
   // Debug logging
   useEffect(() => {
-    console.log('[AlluvialDiagram Debug]');
-    console.log('  Container:', containerWidth, 'x', containerHeight);
-    console.log('  Chart:', chartWidth, 'x', chartHeight);
-    console.log('  Node count (sources/targets):', sources.length, targets.length);
-    console.log('  nodeHeight:', nodeHeight);
-    console.log('  nodePadding:', nodePadding);
-    console.log('  labelFontSize:', labelFontSize);
-  }, [containerWidth, containerHeight, chartWidth, chartHeight, sources.length, targets.length, nodeHeight, nodePadding, labelFontSize]);
+    if (sources.length === 0 || targets.length === 0) return;
+    
+    console.log('=== ALLUVIAL DIAGRAM DEBUG ===');
+    console.log('🖥️  Container Dimensions:', containerWidth, 'x', containerHeight);
+    console.log('📏 Margin:', margin);
+    console.log('📊 Chart Dimensions:', chartHeight, 'x', chartHeight);
+    console.log('🎯 Available Chart Space:', chartHeight, 'x', chartHeight);
+    console.log('📈 Node Count - Sources:', sources.length, 'Targets:', targets.length);
+    console.log('🔢 Node Height:', nodeHeight, 'Node Padding:', nodePadding);
+    console.log('🔤 Label Font Size:', labelFontSize);
+    console.log('📐 Max Label Width:', Math.max(...[...sources, ...targets].map(label => measureTextWidth(label, `bold ${labelFontSize}px Avenir Next World, sans-serif`)), 80));
+    console.log('================================');
+  }, [containerWidth, containerHeight, chartHeight, margin, sources.length, targets.length, nodeHeight, nodePadding, labelFontSize]);
 
   // Use refs to track current values without triggering re-renders
   const currentSourceRef = useRef(currentSource);
@@ -336,7 +458,7 @@ export default function AlluvialDiagram({
 
   // Get visual order of source nodes (top-to-bottom as they appear)
   const sortedSources = useMemo(() => {
-    if (!filteredData.length || !chartWidth || !chartHeight) return sources;
+    if (!filteredData.length || !chartHeight || !chartHeight) return sources;
 
     const sourcesForNodes = [...sources];
     if (currentSource === 'years_at_medtronic') {
@@ -377,7 +499,7 @@ export default function AlluvialDiagram({
       .nodeId((d: any) => d.id)
       .nodeWidth(12)
       .nodePadding(nodePadding)
-      .extent([[0, 0], [chartWidth, chartHeight]]);
+      .extent([[0, 0], [chartHeight, chartHeight]]);
 
     const sankeyData = sankeyGenerator({
       nodes: nodes.map((d) => ({ ...d })),
@@ -390,7 +512,7 @@ export default function AlluvialDiagram({
       .sort((a: any, b: any) => a.y0 - b.y0);
 
     return sourceNodes.map((d: any) => d.name);
-  }, [filteredData, sources, targets, currentSource, currentTarget, chartWidth, chartHeight, nodePadding]);
+  }, [filteredData, sources, targets, currentSource, currentTarget, chartHeight, nodePadding]);
 
   // Enhanced animation function with comprehensive debug tracking
   const animate = useCallback(() => {
@@ -691,10 +813,10 @@ export default function AlluvialDiagram({
       .nodeId((d: any) => d.id)
       .nodeWidth(12)
       .nodePadding(nodePadding)
-      .extent([[0, 0], [chartWidth, chartHeight]]);
+      .extent([[0, 0], [chartHeight, chartHeight]]);
     const sankeyData = sankeyGenerator({ nodes: nodes.map((d) => ({ ...d })), links: links.map((d) => ({ ...d })) });
     setDebugSankeyData(sankeyData);
-  }, [sources, targets, chartWidth, chartHeight, nodePadding]);
+  }, [sources, targets, chartHeight, nodePadding]);
 
   // Render Sankey diagram
   useEffect(() => {
@@ -705,7 +827,8 @@ export default function AlluvialDiagram({
     svg.selectAll('*').remove(); // Clear previous content
     svg
       .attr('width', containerWidth)
-      .attr('height', containerHeight);
+      .attr('height', containerHeight)
+      .attr('viewBox', `0 0 ${containerWidth} ${containerHeight}`);
 
     // --- Sankey node/link creation and vertical centering (deduplicated) ---
     // Sort source nodes to maintain a fixed order (same as animation)
@@ -738,6 +861,14 @@ export default function AlluvialDiagram({
       (currentSource !== 'years_at_medtronic' || d.years_at_medtronic !== null) &&
       (currentTarget !== 'years_at_medtronic' || d.years_at_medtronic !== null)
     );
+
+    // Debug data
+    console.log('📊 DATA DEBUG:');
+    console.log('  Current source:', currentSource, 'Current target:', currentTarget);
+    console.log('  Filtered data count:', filteredData.length);
+    console.log('  Valid data count:', validData.length);
+    console.log('  Sources:', sources);
+    console.log('  Targets:', targets);
 
     // Build nodes array with unique ids
     const nodes = [
@@ -812,6 +943,18 @@ export default function AlluvialDiagram({
 
     const links = Array.from(linksMap.values());
 
+    // Debug links
+    console.log('🔗 LINKS DEBUG:');
+    console.log('  Total links created:', links.length);
+    console.log('  Non-dummy links:', links.filter(l => !l.isDummy).length);
+    console.log('  Dummy links:', links.filter(l => l.isDummy).length);
+    console.log('  Sample links:', links.slice(0, 5).map(l => ({ 
+      source: l.source, 
+      target: l.target, 
+      value: l.value, 
+      isDummy: l.isDummy 
+    })));
+
     // --- DYNAMIC NODE PADDING ---
     // Reduce nodePadding for sparse data
     let dynamicNodePadding = nodePadding;
@@ -819,17 +962,35 @@ export default function AlluvialDiagram({
       dynamicNodePadding = Math.max(8, nodePadding / 2);
     }
 
-    // Sankey layout
+    // Sankey layout - ensure it uses the full available chart space and leftmost nodes are flush
     const sankeyGenerator = sankey<any, any>()
       .nodeId((d: any) => d.id)
       .nodeWidth(12)
       .nodePadding(dynamicNodePadding)
-      .extent([[0, 0], [chartWidth, chartHeight]]);
+      .extent([[0, 0], [chartWidth, chartHeight]]); // left edge is 0
 
     const sankeyData = sankeyGenerator({
       nodes: nodes.map((d) => ({ ...d })),
       links: links.map((d) => ({ ...d })),
     });
+
+    // Debug Sankey layout
+    console.log('🔍 SANKEY LAYOUT DEBUG:');
+    console.log('  Sankey extent:', [[0, 0], [chartWidth, chartHeight]]);
+    console.log('  Input nodes:', nodes.length, 'Input links:', links.length);
+    console.log('  Output nodes:', sankeyData.nodes.length, 'Output links:', sankeyData.links.length);
+    console.log('  Sample nodes:', sankeyData.nodes.slice(0, 3).map(n => ({ 
+      id: n.id, 
+      x0: n.x0, 
+      x1: n.x1, 
+      y0: n.y0, 
+      y1: n.y1 
+    })));
+    console.log('  Sample links:', sankeyData.links.slice(0, 3).map(l => ({ 
+      source: l.source.id, 
+      target: l.target.id, 
+      value: l.value
+    })));
 
     // --- FORCE ROW ALIGNMENT IF NODE SETS MATCH ---
     // If left and right node sets have the same length and order, align their y0/y1
@@ -871,8 +1032,20 @@ export default function AlluvialDiagram({
     const usedHeight = maxY - minY;
     const offsetY = Math.max(0, (chartHeight - usedHeight) / 2 - minY);
 
+    // Debug positioning
+    console.log('📍 POSITIONING DEBUG:');
+    console.log('  Node Y range:', minY, 'to', maxY, '(used height:', usedHeight, ')');
+    console.log('  Chart height:', chartHeight);
+    console.log('  Vertical offset:', offsetY);
+    console.log('  Group transform:', `translate(${margin.left},${margin.top + offsetY})`);
+
     // Create a group for the chart area with margin translation and vertical centering
-    const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top + offsetY})`);
+    const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top + offsetY})`); // left margin only for labels/dropdowns
+    
+    // Debug the actual transform
+    console.log('🎭 SVG Transform:', `translate(${margin.left},${margin.top + offsetY})`);
+    console.log('📐 Actual SVG dimensions:', svg.attr('width'), 'x', svg.attr('height'));
+    console.log('📊 Chart area after margins:', chartHeight, 'x', chartHeight);
 
     let defs = svg.select<SVGDefsElement>('defs');
     if (defs.empty()) defs = svg.append('defs') as d3.Selection<SVGDefsElement, unknown, null, undefined>;
@@ -936,7 +1109,26 @@ export default function AlluvialDiagram({
       .enter()
       .append('path')
       .attr('d', clampedSankeyLinkHorizontal())
-      .attr('stroke', (d: any) => getNodeColor(d.source, getCurrentThemeColors(), settings.isDarkMode))
+      .attr('stroke', (d: any) => {
+        // Use shared color config if available
+        if (CATEGORY_COLORS[d.source.name]) return CATEGORY_COLORS[d.source.name];
+        const color = getNodeColor(d.source, getCurrentThemeColors(), settings.isDarkMode);
+        // Enhanced fallback color logic for dark mode links and unmapped categories
+        if (!color || color === '#000000' || color === 'black' || color === '#000') {
+          // D3 categorical palette (same as above)
+          const d3Palette = [
+            '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f',
+            '#bcbd22', '#17becf', '#393b79', '#637939', '#8c6d31', '#843c39', '#7b4173', '#5254a3',
+            '#9c9ede', '#cedb9c', '#e7ba52', '#ad494a', '#a55194', '#6b6ecf', '#b5cf6b', '#bd9e39',
+            '#ce6dbd', '#de9ed6', '#3182bd', '#f33e52', '#bdbdbd', '#6baed6', '#fd8d3c', '#e6550d',
+            '#31a354', '#756bb1', '#636363', '#969696', '#e41a1c', '#377eb8', '#4daf4a', '#984ea3',
+            '#ff7f00', '#ffff33', '#a65628', '#f781bf', '#999999'
+          ];
+          const index = Math.abs(d.source.name.split('').reduce((acc: number, c: string) => acc + c.charCodeAt(0), 0)) % d3Palette.length;
+          return d3Palette[index];
+        }
+        return color;
+      })
       .attr('stroke-width', (d: any) => Math.min(Math.max(settings.isDarkMode ? 2 : 1, d.width), maxLinkWidth))
       .attr('fill', 'none')
       .attr('filter', (d: any) => {
@@ -1063,11 +1255,22 @@ export default function AlluvialDiagram({
         .attr('height', (d: any) => d.y1 - d.y0)
         .attr('width', (d: any) => d.x1 - d.x0)
         .attr('fill', (d: any) => {
+          // Use shared color config if available
+          if (CATEGORY_COLORS[d.name]) return CATEGORY_COLORS[d.name];
           const color = getNodeColor(d, getCurrentThemeColors(), settings.isDarkMode);
-          // Fallback to a default color if getNodeColor returns invalid color
+          // Enhanced fallback color logic for dark mode and unmapped categories
           if (!color || color === '#000000' || color === 'black' || color === '#000') {
-            console.warn('Invalid color for node:', d.name, d.category, 'using fallback');
-            return settings.isDarkMode ? '#4a90e2' : '#2563eb';
+            // D3 categorical palette (20+ colors, high contrast)
+            const d3Palette = [
+              '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f',
+              '#bcbd22', '#17becf', '#393b79', '#637939', '#8c6d31', '#843c39', '#7b4173', '#5254a3',
+              '#9c9ede', '#cedb9c', '#e7ba52', '#ad494a', '#a55194', '#6b6ecf', '#b5cf6b', '#bd9e39',
+              '#ce6dbd', '#de9ed6', '#3182bd', '#f33e52', '#bdbdbd', '#6baed6', '#fd8d3c', '#e6550d',
+              '#31a354', '#756bb1', '#636363', '#969696', '#e41a1c', '#377eb8', '#4daf4a', '#984ea3',
+              '#ff7f00', '#ffff33', '#a65628', '#f781bf', '#999999'
+            ];
+            const index = Math.abs(d.name.split('').reduce((acc: number, c: string) => acc + c.charCodeAt(0), 0)) % d3Palette.length;
+            return d3Palette[index];
           }
           return color;
         })
@@ -1139,11 +1342,22 @@ export default function AlluvialDiagram({
         .attr('height', (d: any) => d.y1 - d.y0)
         .attr('width', (d: any) => d.x1 - d.x0)
         .attr('fill', (d: any) => {
+          // Use shared color config if available
+          if (CATEGORY_COLORS[d.name]) return CATEGORY_COLORS[d.name];
           const color = getNodeColor(d, getCurrentThemeColors(), settings.isDarkMode);
-          // Fallback to a default color if getNodeColor returns invalid color
+          // Enhanced fallback color logic for dark mode and unmapped categories
           if (!color || color === '#000000' || color === 'black' || color === '#000') {
-            console.warn('Invalid color for node:', d.name, d.category, 'using fallback');
-            return settings.isDarkMode ? '#4a90e2' : '#2563eb';
+            // D3 categorical palette (20+ colors, high contrast)
+            const d3Palette = [
+              '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f',
+              '#bcbd22', '#17becf', '#393b79', '#637939', '#8c6d31', '#843c39', '#7b4173', '#5254a3',
+              '#9c9ede', '#cedb9c', '#e7ba52', '#ad494a', '#a55194', '#6b6ecf', '#b5cf6b', '#bd9e39',
+              '#ce6dbd', '#de9ed6', '#3182bd', '#f33e52', '#bdbdbd', '#6baed6', '#fd8d3c', '#e6550d',
+              '#31a354', '#756bb1', '#636363', '#969696', '#e41a1c', '#377eb8', '#4daf4a', '#984ea3',
+              '#ff7f00', '#ffff33', '#a65628', '#f781bf', '#999999'
+            ];
+            const index = Math.abs(d.name.split('').reduce((acc: number, c: string) => acc + c.charCodeAt(0), 0)) % d3Palette.length;
+            return d3Palette[index];
           }
           return color;
         })
@@ -1232,11 +1446,22 @@ export default function AlluvialDiagram({
       .attr('height', (d: any) => d.y1 - d.y0)
       .attr('width', (d: any) => d.x1 - d.x0)
               .attr('fill', (d: any) => {
+          // Use shared color config if available
+          if (CATEGORY_COLORS[d.name]) return CATEGORY_COLORS[d.name];
           const color = getNodeColor(d, getCurrentThemeColors(), settings.isDarkMode);
-          // Fallback to a default color if getNodeColor returns invalid color
+          // Enhanced fallback color logic for dark mode and unmapped categories
           if (!color || color === '#000000' || color === 'black' || color === '#000') {
-            console.warn('Invalid color for node:', d.name, d.category, 'using fallback');
-            return settings.isDarkMode ? '#4a90e2' : '#2563eb';
+            // D3 categorical palette (20+ colors, high contrast)
+            const d3Palette = [
+              '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f',
+              '#bcbd22', '#17becf', '#393b79', '#637939', '#8c6d31', '#843c39', '#7b4173', '#5254a3',
+              '#9c9ede', '#cedb9c', '#e7ba52', '#ad494a', '#a55194', '#6b6ecf', '#b5cf6b', '#bd9e39',
+              '#ce6dbd', '#de9ed6', '#3182bd', '#f33e52', '#bdbdbd', '#6baed6', '#fd8d3c', '#e6550d',
+              '#31a354', '#756bb1', '#636363', '#969696', '#e41a1c', '#377eb8', '#4daf4a', '#984ea3',
+              '#ff7f00', '#ffff33', '#a65628', '#f781bf', '#999999'
+            ];
+            const index = Math.abs(d.name.split('').reduce((acc: number, c: string) => acc + c.charCodeAt(0), 0)) % d3Palette.length;
+            return d3Palette[index];
           }
           return color;
         });
@@ -1247,8 +1472,21 @@ export default function AlluvialDiagram({
   const sortedTargetsForHighlight = useMemo(() => {
     const sorted = [...targets];
     if (currentTarget === 'years_at_medtronic') {
+      // Sort years in chronological order
       sorted.sort((a, b) => YEARS_CATEGORIES.indexOf(a) - YEARS_CATEGORIES.indexOf(b));
+    } else if (currentTarget === 'learning_style') {
+      // Sort learning styles in a consistent order
+      const learningStyleOrder = ['Visual', 'Auditory', 'Kinesthetic', 'Reading/Writing', 'Mixed'];
+      sorted.sort((a, b) => {
+        const aIndex = learningStyleOrder.indexOf(a);
+        const bIndex = learningStyleOrder.indexOf(b);
+        if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
+        if (aIndex === -1) return 1;
+        if (bIndex === -1) return -1;
+        return aIndex - bIndex;
+      });
     } else {
+      // Alphabetical sort for other categories
       sorted.sort();
     }
     return sorted;
@@ -1416,7 +1654,7 @@ export default function AlluvialDiagram({
   // Create sorted sources array for highlighting (same as rendering and animation)
   const sortedSourcesForHighlight = useMemo(() => {
     let visualOrder: string[] = [];
-    if (filteredData.length && chartWidth > 0 && chartHeight > 0) {
+    if (filteredData.length && chartHeight > 0 && chartHeight > 0) {
       const sourcesForNodes = [...sources];
   if (currentSource === 'years_at_medtronic') {
         sourcesForNodes.sort((a, b) => YEARS_CATEGORIES.indexOf(a) - YEARS_CATEGORIES.indexOf(b));
@@ -1445,7 +1683,7 @@ export default function AlluvialDiagram({
         .nodeId((d: any) => d.id)
         .nodeWidth(12)
         .nodePadding(nodePadding)
-        .extent([[0, 0], [chartWidth, chartHeight]]);
+        .extent([[0, 0], [chartHeight, chartHeight]]);
       const sankeyData = sankeyGenerator({
         nodes: nodes.map((d) => ({ ...d })),
         links: links.map((d) => ({ ...d })),
@@ -1457,7 +1695,7 @@ export default function AlluvialDiagram({
         .map((d: any) => d.name);
     }
     return visualOrder.length ? visualOrder : [...sources];
-  }, [filteredData, currentSource, currentTarget, sources, targets, chartWidth, chartHeight, nodePadding]);
+  }, [filteredData, currentSource, currentTarget, sources, targets, chartHeight, nodePadding]);
 
   // Determine which source or target to highlight based on animation state
   let highlightSourceName: string | null = null;
@@ -1679,9 +1917,9 @@ export default function AlluvialDiagram({
       )}
       <svg
         ref={svgRef}
-        width={chartWidth + margin.left + margin.right}
-        height={chartHeight + margin.top + margin.bottom}
-        viewBox={`0 0 ${chartWidth + margin.left + margin.right} ${chartHeight + margin.top + margin.bottom}`}
+        width={containerWidth}
+        height={containerHeight}
+        viewBox={`0 0 ${containerWidth} ${containerHeight}`}
         style={{ display: 'block', width: '100%', height: '100%', background: 'transparent' }}
       >
         {/* Main chart group, translated by margin */}
